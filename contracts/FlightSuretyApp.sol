@@ -16,6 +16,10 @@ contract FlightSuretyApp {
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
 
+    // Data contract reference
+    FlightSuretyData flightSuretyData;
+
+
     // Flight status codees
     uint8 private constant STATUS_CODE_UNKNOWN = 0;
     uint8 private constant STATUS_CODE_ON_TIME = 10;
@@ -73,10 +77,12 @@ contract FlightSuretyApp {
     */
     constructor
                                 (
+                                    address _dataContract
                                 ) 
                                 public 
     {
         contractOwner = msg.sender;
+        flightSuretyData = FlightSuretyData(_dataContract);
     }
 
     /********************************************************************************************/
@@ -84,11 +90,11 @@ contract FlightSuretyApp {
     /********************************************************************************************/
 
     function isOperational() 
-                            public 
-                            pure 
+                            external 
                             returns(bool) 
     {
-        return true;  // Modify to call data contract's status
+        bool ops = flightSuretyData.isOperational();
+        return ops;  // call data contract's status
     }
 
     /********************************************************************************************/
@@ -333,5 +339,8 @@ contract FlightSuretyApp {
     }
 
 // endregion
-
 }   
+
+contract FlightSuretyData {
+    function isOperational() external;                      
+}
