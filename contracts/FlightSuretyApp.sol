@@ -342,5 +342,5 @@ contract FlightSuretyApp {
 }   
 
 contract FlightSuretyData {
-    function isOperational() external;                      
+    function isOperational() external pure {}                     
 }
