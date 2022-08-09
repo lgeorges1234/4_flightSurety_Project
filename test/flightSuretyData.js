@@ -1,8 +1,9 @@
 
 var Test = require('../config/testConfig.js');
 var BigNumber = require('bignumber.js');
+var AIRLINE_SEED_FUNDING = 10;
 
-contract('Flight Surety Tests', async (accounts) => {
+contract('Flight Surety Data Tests', async (accounts) => {
 
   var config;
   before('setup contract', async () => {
@@ -14,7 +15,7 @@ contract('Flight Surety Tests', async (accounts) => {
   /* Operations and Settings                                                              */
   /****************************************************************************************/
 
-  it(`(multiparty) has correct initial isOperational() value`, async function () {
+  it(`(multiparty) FlighySuretyData has correct initial isOperational() value`, async function () {
 
     // Get operating status
     let status = await config.flightSuretyData.isOperational.call();
@@ -22,13 +23,7 @@ contract('Flight Surety Tests', async (accounts) => {
 
   });
 
-  it(`(multiparty) has correct initial isOperational() value`, async function () {
 
-    // Get operating status
-    let status = await config.flightSuretyData.isOperational.call();
-    assert.equal(status, true, "Incorrect initial operating status value");
-
-  });
 
   it(`(multiparty) can block access to setOperatingStatus() for non-Contract Owner account`, async function () {
 
@@ -79,23 +74,43 @@ contract('Flight Surety Tests', async (accounts) => {
 
   });
 
-  it('(airline) cannot register an Airline using registerAirline() if it is not funded', async () => {
+  it('(airline) can register an Airline using registerAirline()', async () => {
     
     // ARRANGE
     let newAirline = accounts[2];
 
     // ACT
     try {
-        await config.flightSuretyApp.registerAirline(newAirline, {from: config.firstAirline});
-    }
+        await config.flightSuretyData.registerAirline(newAirline, {from: config.firstAirline});
+      }
     catch(e) {
 
     }
     let result = await config.flightSuretyData.isAirline.call(newAirline); 
-
     // ASSERT
-    assert.equal(result, false, "Airline should not be able to register another airline if it hasn't provided funding");
+    assert.equal(result, true, "Airline should be able to register another airline");
 
+  });
+
+  it('(airline) can provide seed funds using submitFundsAirline) ', async () => {
+    
+    // ARRANGE
+    let newAirline = accounts[2];
+    let AIRLINE_SEED_FUNDING = web3.utils.toWei("10", "ether");
+    // ACT
+    try {
+        await config.flightSuretyData.registerAirline(newAirline, {from: config.firstAirline});
+        await config.flightSuretyData.submitFundsAirline(newAirline, {from: newAirline, value: AIRLINE_SEED_FUNDING});
+    }
+    catch(e) {
+
+    }
+    await config.flightSuretyData.isAirline.call(newAirline); 
+
+    let result = await config.flightSuretyData.isFundedAirline.call(newAirline); 
+    // ASSERT
+    assert.equal(result, true, "Airline has not provided funding");
+    
   });
  
 

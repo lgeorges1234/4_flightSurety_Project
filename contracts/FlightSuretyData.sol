@@ -9,8 +9,18 @@ contract FlightSuretyData {
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
 
-    address private contractOwner;                                      // Account used to deploy contract
-    bool private operational = true;                                    // Blocks all state changes throughout the contract if false
+    address private contractOwner;         // Account used to deploy contract
+    bool private operational = true;       // Blocks all state changes throughout the contract if false
+
+    struct Airline {
+        address airline;
+        bool registered;
+        bool funded;
+    }
+
+
+    mapping (address => Airline) private Airlines;
+    mapping(address => uint) private balance;
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
@@ -56,6 +66,12 @@ contract FlightSuretyData {
         _;
     }
 
+    modifier requireIsRegistered(address airline)
+    {
+        require(Airlines[airline].registered == true);
+        _;
+    }
+
     /********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
@@ -67,7 +83,6 @@ contract FlightSuretyData {
     */      
     function isOperational() 
                             external 
-                            pure
                             returns(bool) 
     {
         return operational;
@@ -100,10 +115,49 @@ contract FlightSuretyData {
     */   
     function registerAirline
                             (   
+                                address _airline
                             )
                             external
-                            pure
+                            requireIsOperational
+                            returns(bool)
     {
+        Airlines[_airline] = Airline({airline: _airline, registered: true, funded: false});
+    }
+
+    function submitFundsAirline
+                            (   
+                                address _airline
+                            )
+                            payable
+                            external
+                            requireIsOperational
+    {
+        contractOwner.transfer(msg.value);
+        balance[msg.sender] += msg.value;
+        Airlines[_airline].funded = true;
+    }
+
+
+    function isAirline 
+                        (
+                            address _airline 
+                        )
+                        external
+                        requireIsOperational
+                        returns(bool)
+    {
+        return Airlines[_airline].registered;
+    }
+
+    function isFundedAirline 
+                        (
+                            address _airline 
+                        )
+                        external
+                        requireIsOperational
+                        returns(bool)
+    {
+        return Airlines[_airline].funded;
     }
 
 

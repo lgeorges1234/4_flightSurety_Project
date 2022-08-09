@@ -28,7 +28,13 @@ contract FlightSuretyApp {
     uint8 private constant STATUS_CODE_LATE_TECHNICAL = 40;
     uint8 private constant STATUS_CODE_LATE_OTHER = 50;
 
-    address private contractOwner;          // Account used to deploy contract
+    // Account used to deploy contract
+    address private contractOwner;          
+
+    // Amount of funding
+    uint public constant FLIGHT_INSURANCE_AMOUNT = 1 ether;
+    uint public constant AIRLINE_SEED_FUNDING = 10 ether;
+
 
     struct Flight {
         bool isRegistered;
@@ -38,7 +44,8 @@ contract FlightSuretyApp {
     }
     mapping(bytes32 => Flight) private flights;
 
- 
+
+
     /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
     /********************************************************************************************/
@@ -67,6 +74,18 @@ contract FlightSuretyApp {
         _;
     }
 
+    modifier requireRegisteredAirline()
+    {
+        require(flightSuretyData.isAirline(msg.sender) == true, "Airline making the call is not registred");
+        _;
+    }
+
+    modifier requireFundedAirline()
+    {
+        require(flightSuretyData.isFundedAirline(msg.sender) == true, "Airline making the call has not provided funds");
+        _;
+    }
+
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
     /********************************************************************************************/
@@ -77,12 +96,14 @@ contract FlightSuretyApp {
     */
     constructor
                                 (
-                                    address _dataContract
+                                    address _dataContract,
+                                    address _firstAirline
                                 ) 
                                 public 
     {
         contractOwner = msg.sender;
         flightSuretyData = FlightSuretyData(_dataContract);
+        flightSuretyData.registerAirline(_firstAirline);
     }
 
     /********************************************************************************************/
@@ -93,8 +114,7 @@ contract FlightSuretyApp {
                             external 
                             returns(bool) 
     {
-        bool ops = flightSuretyData.isOperational();
-        return ops;  // call data contract's status
+        return flightSuretyData.isOperational();  // call data contract's status
     }
 
     /********************************************************************************************/
@@ -107,15 +127,30 @@ contract FlightSuretyApp {
     *
     */   
     function registerAirline
-                            (   
+                            (
+                                address _airline   
                             )
                             external
-                            pure
+                            requireIsOperational()
+                            requireRegisteredAirline()
+                            requireFundedAirline()
                             returns(bool success, uint256 votes)
     {
-        return (success, 0);
+        flightSuretyData.registerAirline(_airline);
+        return (flightSuretyData.isAirline(_airline), 0);
     }
 
+    // function submitFundsAirline(
+    //                                 address _airline
+    //                             )
+    //                             external
+    //                             requireIsOperational()
+    //                             returns(bool succes)
+    // {
+    //     require(msg.value == 10 ether, "You must provide 10 Ethers to fund the seed");
+    //     flightSuretyData.submitFundsAirline(_airline, AIRLINE_SEED_FUNDING);
+    //     return (flightSuretyData.isFundedAirline(_airline));
+    // }
 
    /**
     * @dev Register a future flight for insuring.
@@ -342,5 +377,9 @@ contract FlightSuretyApp {
 }   
 
 contract FlightSuretyData {
-    function isOperational() external pure {}                     
+    function isOperational() external pure returns(bool) {}  
+    function registerAirline (address _airline) external returns(bool) {} 
+    function submitFundsAirline (address _airline, uint AIRLINE_SEED_FUNDING) external returns(bool) {}
+    function isAirline ( address _airline) external returns(bool) {}        
+    function isFundedAirline (address _airline ) external returns(bool){}          
 }
