@@ -15,12 +15,15 @@ contract FlightSuretyData {
     struct Airline {
         address airline;
         bool registered;
-        bool funded;
+        uint256 funded;
     }
 
 
     mapping (address => Airline) private Airlines;
-    mapping(address => uint) private balance;
+
+    // total of funds raised by companies
+    uint256 private totalBalance;
+
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
@@ -121,20 +124,28 @@ contract FlightSuretyData {
                             requireIsOperational
                             returns(bool)
     {
-        Airlines[_airline] = Airline({airline: _airline, registered: true, funded: false});
+        Airlines[_airline] = Airline({airline: _airline, registered: true, funded: 0});
     }
 
     function submitFundsAirline
                             (   
-                                address _airline
+                                address _airline,
+                                uint256 _amount
                             )
-                            payable
                             external
+                            payable
                             requireIsOperational
     {
-        contractOwner.transfer(msg.value);
-        balance[msg.sender] += msg.value;
-        Airlines[_airline].funded = true;
+        // Store the actual balance of the contract
+        uint256 beforeBalance = totalBalance;
+        // Send the amount to the fund function
+        // to transfer the amount to the contract address
+        // and add the amount to the contract balance
+        fund(_airline, _amount);
+        // Check if the balance has been increased
+        require(totalBalance.sub(beforeBalance) == _amount, "Funds have not been provided");
+        // Mark the airline as "funded"
+        Airlines[_airline].funded = _amount;
     }
 
 
@@ -157,7 +168,10 @@ contract FlightSuretyData {
                         requireIsOperational
                         returns(bool)
     {
-        return Airlines[_airline].funded;
+        if(Airlines[_airline].funded > 0){
+            return true;
+        }
+        return false;
     }
 
 
@@ -205,10 +219,24 @@ contract FlightSuretyData {
     */   
     function fund
                             (   
+                                address _account,
+                                uint256 _amount
                             )
-                            public
                             payable
     {
+        // Transfer the amount to the contract address
+        contractOwner.transfer(_amount);
+        // Increase the balance of the contract
+        totalBalance = totalBalance.add(_amount);
+    }
+
+    function getBalance
+                            (
+                            )
+                            external
+                            returns(uint256)
+    {
+        return totalBalance;
     }
 
     function getFlightKey
@@ -232,7 +260,7 @@ contract FlightSuretyData {
                             external 
                             payable 
     {
-        fund();
+        // fund(address, uint256);
     }
 
 

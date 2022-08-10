@@ -1,5 +1,5 @@
 
-var Test = require('./config/testConfig.js');
+var Test = require('../config/testConfig.js');
 var BigNumber = require('bignumber.js');
 
 contract('Flight Surety App Tests ', async (accounts) => {

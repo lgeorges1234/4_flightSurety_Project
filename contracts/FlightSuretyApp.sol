@@ -33,7 +33,7 @@ contract FlightSuretyApp {
 
     // Amount of funding
     uint public constant FLIGHT_INSURANCE_AMOUNT = 1 ether;
-    uint public constant AIRLINE_SEED_FUNDING = 10 ether;
+    uint public constant AIRLINE_REGISTRATION_FEE = 10 ether;
 
 
     struct Flight {
@@ -140,17 +140,19 @@ contract FlightSuretyApp {
         return (flightSuretyData.isAirline(_airline), 0);
     }
 
-    // function submitFundsAirline(
-    //                                 address _airline
-    //                             )
-    //                             external
-    //                             requireIsOperational()
-    //                             returns(bool succes)
-    // {
-    //     require(msg.value == 10 ether, "You must provide 10 Ethers to fund the seed");
-    //     flightSuretyData.submitFundsAirline(_airline, AIRLINE_SEED_FUNDING);
-    //     return (flightSuretyData.isFundedAirline(_airline));
-    // }
+    function submitFundsAirline()
+                                external
+                                payable
+                                requireIsOperational
+                                returns(bool succes)
+    {
+        // require(msg.value == 10 ether, "You must provide 10 Ethers to fund the seed");
+        // pass ETH to data contract
+        flightSuretyData.funding(msg.sender, AIRLINE_REGISTRATION_FEE);
+        flightSuretyData.submitFundsAirline(msg.sender);
+        return (flightSuretyData.isFundedAirline(msg.sender));
+    }
+
 
    /**
     * @dev Register a future flight for insuring.
@@ -377,9 +379,15 @@ contract FlightSuretyApp {
 }   
 
 contract FlightSuretyData {
-    function isOperational() external pure returns(bool) {}  
+    function isOperational() external pure returns(bool) {} 
+
+    // Airlines
     function registerAirline (address _airline) external returns(bool) {} 
-    function submitFundsAirline (address _airline, uint AIRLINE_SEED_FUNDING) external returns(bool) {}
-    function isAirline ( address _airline) external returns(bool) {}        
-    function isFundedAirline (address _airline ) external returns(bool){}          
+    function submitFundsAirline (address _airline) external returns(bool) {}
+    function isAirline (address _airline) external returns(bool) {}        
+    function isFundedAirline (address _airline ) external returns(bool){}   
+
+    // Fund
+    // function fund(address account) payable external;       
+    function funding(address account, uint256 amount) external payable {}
 }

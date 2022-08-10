@@ -1,7 +1,6 @@
 
 var Test = require('../config/testConfig.js');
 var BigNumber = require('bignumber.js');
-var AIRLINE_SEED_FUNDING = 10;
 
 contract('Flight Surety Data Tests', async (accounts) => {
 
@@ -89,29 +88,30 @@ contract('Flight Surety Data Tests', async (accounts) => {
     let result = await config.flightSuretyData.isAirline.call(newAirline); 
     // ASSERT
     assert.equal(result, true, "Airline should be able to register another airline");
-
   });
 
-  it('(airline) can provide seed funds using submitFundsAirline) ', async () => {
+  it('(airline) can fund their registration using submitFundsAirline', async () => {
     
     // ARRANGE
     let newAirline = accounts[2];
-    let AIRLINE_SEED_FUNDING = web3.utils.toWei("10", "ether");
+    let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
     // ACT
+    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
     try {
         await config.flightSuretyData.registerAirline(newAirline, {from: config.firstAirline});
-        await config.flightSuretyData.submitFundsAirline(newAirline, {from: newAirline, value: AIRLINE_SEED_FUNDING});
+        await config.flightSuretyData.submitFundsAirline(newAirline, AIRLINE_REGISTRATION_FEE, {from: newAirline});
     }
     catch(e) {
 
     }
-    await config.flightSuretyData.isAirline.call(newAirline); 
-
+    let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
     let result = await config.flightSuretyData.isFundedAirline.call(newAirline); 
     // ASSERT
-    assert.equal(result, true, "Airline has not provided funding");
-    
+    assert.equal(result, true, "Airline has not been marked as funded");
+    assert.equal(contractBalanceAfter-contractBalanceBefore, AIRLINE_REGISTRATION_FEE, "Airline funds have not been collected")
   });
  
+
+
 
 });
