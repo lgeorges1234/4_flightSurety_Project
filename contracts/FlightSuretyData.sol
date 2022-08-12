@@ -9,8 +9,11 @@ contract FlightSuretyData {
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
 
-    address private contractOwner;         // Account used to deploy contract
-    bool private operational = true;       // Blocks all state changes throughout the contract if false
+    address private contractOwner;          // Account used to deploy contract
+    bool private operational = true;        // Blocks all state changes throughout the contract if false
+
+    uint256 private totalBalance;           // total of funds raised by companies
+    
 
     struct Airline {
         address airline;
@@ -21,8 +24,7 @@ contract FlightSuretyData {
 
     mapping (address => Airline) private Airlines;
 
-    // total of funds raised by companies
-    uint256 private totalBalance;
+
 
 
     /********************************************************************************************/
@@ -135,6 +137,7 @@ contract FlightSuretyData {
                             external
                             payable
                             requireIsOperational
+                            requireIsRegistered(_airline)
     {
         // Store the actual balance of the contract
         uint256 beforeBalance = totalBalance;
@@ -225,7 +228,7 @@ contract FlightSuretyData {
                             payable
     {
         // Transfer the amount to the contract address
-        contractOwner.transfer(_amount);
+        // contractOwner.transfer(_amount);
         // Increase the balance of the contract
         totalBalance = totalBalance.add(_amount);
     }

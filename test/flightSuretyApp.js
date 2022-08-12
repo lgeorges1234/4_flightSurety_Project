@@ -72,6 +72,44 @@ contract('Flight Surety App Tests ', async (accounts) => {
 
   // });
 
+
+  it('(contractOwner) can register the first Airline using registerAirline()', async () => {
+    
+    // ARRANGE
+    let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
+    // ACT
+    try {
+        await config.flightSuretyApp.registerFirstAirline(config.firstAirline, {from: config.owner});
+      }
+    catch(e) {
+
+    }
+    let result = await config.flightSuretyData.isAirline.call(config.firstAirline); 
+
+    // ASSERT
+    assert.equal(result, true, "Airline should be able to register another airline");
+
+  });
+
+  it('(firstAirline) can fund the first Airline using fundFirstAirline()', async () => {
+    
+    // ARRANGE
+    let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
+    // ACT
+    try {
+        await config.flightSuretyApp.fundFirstAirline({from: config.firstAirline, value: AIRLINE_REGISTRATION_FEE});
+      }
+    catch(e) {
+
+    }
+    let result = await config.flightSuretyData.isFundedAirline.call(config.firstAirline); 
+
+    // ASSERT
+    assert.equal(result, true, "FirstAirline should be able to register itself");
+
+  });
+
+
   it('(airline) can register an Airline using registerAirline()', async () => {
     
     // ARRANGE
@@ -79,7 +117,7 @@ contract('Flight Surety App Tests ', async (accounts) => {
 
     // ACT
     try {
-        await config.flightSuretyApp.registerAirline(newAirline, {from: config.firstAirline});
+        await config.flightSuretyApp.registerAirline(newAirline, {from: config.firstAirline, value:AIRLINE_REGISTRATION_FEE});
       }
     catch(e) {
 

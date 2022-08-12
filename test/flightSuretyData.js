@@ -97,6 +97,7 @@ contract('Flight Surety Data Tests', async (accounts) => {
     let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
     // ACT
     let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    // console.log(contractBalanceBefore.toString())
     try {
         await config.flightSuretyData.registerAirline(newAirline, {from: config.firstAirline});
         await config.flightSuretyData.submitFundsAirline(newAirline, AIRLINE_REGISTRATION_FEE, {from: newAirline});
@@ -105,6 +106,7 @@ contract('Flight Surety Data Tests', async (accounts) => {
 
     }
     let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
+    // console.log(contractBalanceAfter.toString())
     let result = await config.flightSuretyData.isFundedAirline.call(newAirline); 
     // ASSERT
     assert.equal(result, true, "Airline has not been marked as funded");

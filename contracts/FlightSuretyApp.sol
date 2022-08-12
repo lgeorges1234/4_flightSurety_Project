@@ -32,8 +32,8 @@ contract FlightSuretyApp {
     address private contractOwner;          
 
     // Amount of funding
-    uint public constant FLIGHT_INSURANCE_AMOUNT = 1 ether;
-    uint public constant AIRLINE_REGISTRATION_FEE = 10 ether;
+    uint256 public constant FLIGHT_INSURANCE_AMOUNT = 1 ether;
+    uint256 public constant AIRLINE_REGISTRATION_FEE = 10 ether;
 
 
     struct Flight {
@@ -74,6 +74,11 @@ contract FlightSuretyApp {
         _;
     }
 
+    modifier requireEnoughFunds() {
+        require(msg.value == AIRLINE_REGISTRATION_FEE, "You must provide enough Ethers to fund the seed");
+        _;
+    }
+
     modifier requireRegisteredAirline()
     {
         require(flightSuretyData.isAirline(msg.sender) == true, "Airline making the call is not registred");
@@ -103,7 +108,6 @@ contract FlightSuretyApp {
     {
         contractOwner = msg.sender;
         flightSuretyData = FlightSuretyData(_dataContract);
-        flightSuretyData.registerAirline(_firstAirline);
     }
 
     /********************************************************************************************/
@@ -126,6 +130,23 @@ contract FlightSuretyApp {
     * @dev Add an airline to the registration queue
     *
     */   
+
+    function registerFirstAirline
+                                    (
+                                    address _airline
+                                    ) 
+                                    requireContractOwner
+    {
+        flightSuretyData.registerAirline(_airline);
+    }
+
+    function fundFirstAirline 
+                                    (
+                                    )
+    {
+        flightSuretyData.submitFundsAirline(msg.sender, msg.value);
+    }
+
     function registerAirline
                             (
                                 address _airline   
@@ -133,7 +154,6 @@ contract FlightSuretyApp {
                             external
                             requireIsOperational()
                             requireRegisteredAirline()
-                            requireFundedAirline()
                             returns(bool success, uint256 votes)
     {
         flightSuretyData.registerAirline(_airline);
@@ -146,10 +166,8 @@ contract FlightSuretyApp {
                                 requireIsOperational
                                 returns(bool succes)
     {
-        // require(msg.value == 10 ether, "You must provide 10 Ethers to fund the seed");
-        // pass ETH to data contract
-        flightSuretyData.funding(msg.sender, AIRLINE_REGISTRATION_FEE);
-        flightSuretyData.submitFundsAirline(msg.sender);
+        // pass registration fees to data contract to allow the airline to fund the seed.
+        flightSuretyData.submitFundsAirline(msg.sender, AIRLINE_REGISTRATION_FEE);
         return (flightSuretyData.isFundedAirline(msg.sender));
     }
 
@@ -383,11 +401,9 @@ contract FlightSuretyData {
 
     // Airlines
     function registerAirline (address _airline) external returns(bool) {} 
-    function submitFundsAirline (address _airline) external returns(bool) {}
+    function submitFundsAirline (address _airline, uint256 _amount) payable external {}
     function isAirline (address _airline) external returns(bool) {}        
     function isFundedAirline (address _airline ) external returns(bool){}   
 
-    // Fund
-    // function fund(address account) payable external;       
-    function funding(address account, uint256 amount) external payable {}
+
 }
