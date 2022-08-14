@@ -6,6 +6,8 @@ pragma solidity ^0.4.25;
 
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
+import "./FlightSuretyData.sol";
+
 /************************************************** */
 /* FlightSurety Smart Contract                      */
 /************************************************** */
@@ -29,7 +31,7 @@ contract FlightSuretyApp {
     uint8 private constant STATUS_CODE_LATE_OTHER = 50;
 
     // Account used to deploy contract
-    address private contractOwner;          
+    address private contractOwner;        
 
     // Amount of funding
     uint256 public constant FLIGHT_INSURANCE_AMOUNT = 1 ether;
@@ -92,6 +94,12 @@ contract FlightSuretyApp {
     }
 
     /********************************************************************************************/
+    /*                                       EVENTS DECLARATION                                */
+    /********************************************************************************************/
+
+    event LogFunctionFlow(string);
+
+    /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
     /********************************************************************************************/
 
@@ -108,6 +116,7 @@ contract FlightSuretyApp {
     {
         contractOwner = msg.sender;
         flightSuretyData = FlightSuretyData(_dataContract);
+        registerFirstAirline(_firstAirline);
     }
 
     /********************************************************************************************/
@@ -127,7 +136,7 @@ contract FlightSuretyApp {
 
   
    /**
-    * @dev Add an airline to the registration queue
+    * @dev allow contracts owner to register and fund the registration
     *
     */   
 
@@ -136,24 +145,37 @@ contract FlightSuretyApp {
                                     address _airline
                                     ) 
                                     requireContractOwner
+                                    returns(bool)
     {
         flightSuretyData.registerAirline(_airline);
+        return flightSuretyData.isAirline(_airline);
     }
 
-    function fundFirstAirline 
-                                    (
-                                    )
-    {
-        flightSuretyData.submitFundsAirline(msg.sender, msg.value);
-    }
+    // function fundFirstAirline 
+    //                                 (
+    //                                     address _firstAirline,
+    //                                     uint256 _amount
+    //                                 )
+    //                                 requireContractOwner
+    //                                 returns(bool)
+    // {
+    //     require(msg.value == AIRLINE_REGISTRATION_FEE, "You must provide enough Ethers to fund the seed");
+    //     flightSuretyData.submitFundsAirline(_firstAirline, AIRLINE_REGISTRATION_FEE);
+    //     return flightSuretyData.isFundedAirline(_firstAirline);
+    // }
+
+       /**
+    * @dev Add an airline to the registration queue
+    *
+    */   
 
     function registerAirline
                             (
                                 address _airline   
                             )
                             external
-                            requireIsOperational()
-                            requireRegisteredAirline()
+                            requireIsOperational
+                            requireRegisteredAirline
                             returns(bool success, uint256 votes)
     {
         flightSuretyData.registerAirline(_airline);
@@ -164,6 +186,8 @@ contract FlightSuretyApp {
                                 external
                                 payable
                                 requireIsOperational
+                                requireRegisteredAirline
+                                requireEnoughFunds
                                 returns(bool succes)
     {
         // pass registration fees to data contract to allow the airline to fund the seed.
@@ -396,14 +420,14 @@ contract FlightSuretyApp {
 // endregion
 }   
 
-contract FlightSuretyData {
-    function isOperational() external pure returns(bool) {} 
+// contract FlightSuretyData {
+//     function isOperational() external pure returns(bool) {} 
 
-    // Airlines
-    function registerAirline (address _airline) external returns(bool) {} 
-    function submitFundsAirline (address _airline, uint256 _amount) payable external {}
-    function isAirline (address _airline) external returns(bool) {}        
-    function isFundedAirline (address _airline ) external returns(bool){}   
+//     // Airlines
+//     function registerAirline (address _airline) external returns(bool) {} 
+//     function submitFundsAirline (address _airline, uint256 _amount) payable external {}
+//     function isAirline (address _airline) external returns(bool) {}        
+//     function isFundedAirline (address _airline ) external returns(bool){}   
 
 
-}
+// }

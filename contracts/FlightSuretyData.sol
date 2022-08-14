@@ -10,6 +10,7 @@ contract FlightSuretyData {
     /********************************************************************************************/
 
     address private contractOwner;          // Account used to deploy contract
+    address private contractAddress;
     bool private operational = true;        // Blocks all state changes throughout the contract if false
 
     uint256 private totalBalance;           // total of funds raised by companies
@@ -18,7 +19,7 @@ contract FlightSuretyData {
     struct Airline {
         address airline;
         bool registered;
-        uint256 funded;
+        bool funded;
     }
 
 
@@ -42,6 +43,7 @@ contract FlightSuretyData {
                                 public 
     {
         contractOwner = msg.sender;
+        contractAddress = address(this);
     }
 
     /********************************************************************************************/
@@ -126,7 +128,7 @@ contract FlightSuretyData {
                             requireIsOperational
                             returns(bool)
     {
-        Airlines[_airline] = Airline({airline: _airline, registered: true, funded: 0});
+        Airlines[_airline] = Airline({airline: _airline, registered: true, funded: false});
     }
 
     function submitFundsAirline
@@ -135,9 +137,8 @@ contract FlightSuretyData {
                                 uint256 _amount
                             )
                             external
-                            payable
                             requireIsOperational
-                            requireIsRegistered(_airline)
+
     {
         // Store the actual balance of the contract
         uint256 beforeBalance = totalBalance;
@@ -148,7 +149,7 @@ contract FlightSuretyData {
         // Check if the balance has been increased
         require(totalBalance.sub(beforeBalance) == _amount, "Funds have not been provided");
         // Mark the airline as "funded"
-        Airlines[_airline].funded = _amount;
+        Airlines[_airline] = Airline({airline: _airline, registered: true, funded: true});
     }
 
 
@@ -171,10 +172,7 @@ contract FlightSuretyData {
                         requireIsOperational
                         returns(bool)
     {
-        if(Airlines[_airline].funded > 0){
-            return true;
-        }
-        return false;
+        return Airlines[_airline].funded;
     }
 
 
@@ -228,7 +226,7 @@ contract FlightSuretyData {
                             payable
     {
         // Transfer the amount to the contract address
-        // contractOwner.transfer(_amount);
+        // contractAddress.transfer(_amount);
         // Increase the balance of the contract
         totalBalance = totalBalance.add(_amount);
     }

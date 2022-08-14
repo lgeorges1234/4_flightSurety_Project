@@ -4,6 +4,7 @@ var BigNumber = require('bignumber.js');
 
 contract('Flight Surety App Tests ', async (accounts) => {
 
+  let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
   var config;
   before('setup contract', async () => {
     config = await Test.Config(accounts);
@@ -76,70 +77,80 @@ contract('Flight Surety App Tests ', async (accounts) => {
   it('(contractOwner) can register the first Airline using registerAirline()', async () => {
     
     // ARRANGE
-    let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
+
     // ACT
     try {
-        await config.flightSuretyApp.registerFirstAirline(config.firstAirline, {from: config.owner});
+      await config.flightSuretyApp.registerFirstAirline.call(config.firstAirline, {from: config.owner});
       }
     catch(e) {
 
     }
-    let result = await config.flightSuretyData.isAirline.call(config.firstAirline); 
-
+    let result = await config.flightSuretyData.isAirline.call(config.firstAirline);
     // ASSERT
-    assert.equal(result, true, "Airline should be able to register another airline");
+    assert.equal(result, true, "ContractOwner should be able to register the first airline");
 
   });
 
-  it('(firstAirline) can fund the first Airline using fundFirstAirline()', async () => {
+  it('(airline) can fund the airline when registered using submitFundsAirline()', async () => {
     
     // ARRANGE
-    let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
+    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    console.log(contractBalanceBefore.toString())
+    let re = await config.flightSuretyData.isFundedAirline.call(config.firstAirline); 
+    console.log(`data isFundedAirline before: ${re}`)
     // ACT
     try {
-        await config.flightSuretyApp.fundFirstAirline({from: config.firstAirline, value: AIRLINE_REGISTRATION_FEE});
-      }
+
+    }
     catch(e) {
 
     }
+
+    let res = await config.flightSuretyApp.submitFundsAirline.call({from: config.firstAirline, value:AIRLINE_REGISTRATION_FEE});
+    console.log(`app submitFundsAirline return: ${res}`)
+
     let result = await config.flightSuretyData.isFundedAirline.call(config.firstAirline); 
-
+    console.log(`data isFundedAirline after: ${result}`)
+    let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
+    console.log(contractBalanceAfter.toString())
     // ASSERT
-    assert.equal(result, true, "FirstAirline should be able to register itself");
+    assert.equal(result, true, "Airline should be able to fund the contract");
 
   });
 
-
-  it('(airline) can register an Airline using registerAirline()', async () => {
+    it('(airline) can register an Airline using registerAirline()', async () => {
     
-    // ARRANGE
-    let newAirline = accounts[2];
+      // ARRANGE
+      let newAirline = accounts[2];
+      await config.flightSuretyApp.submitFundsAirline.call({from: config.firstAirline, value:AIRLINE_REGISTRATION_FEE});
 
-    // ACT
-    try {
-        await config.flightSuretyApp.registerAirline(newAirline, {from: config.firstAirline, value:AIRLINE_REGISTRATION_FEE});
-      }
-    catch(e) {
-
-    }
-    let result = await config.flightSuretyData.isAirline.call(newAirline); 
-
-    // ASSERT
-    assert.equal(result, true, "Airline should be able to register another airline");
-
-  });
-
-  it('(airline) cannot register an Airline using registerAirline() if it is not funded', async () => {
-    
-    // ARRANGE
-    let newAirline = accounts[2];
-
-    // ACT
-    try {
+      // ACT
+      try {
         await config.flightSuretyApp.registerAirline(newAirline, {from: config.firstAirline});
+        }
+      catch(e) {
+
+      }
+      let result = await config.flightSuretyData.isAirline.call(newAirline); 
+
+  
+      // ASSERT
+      assert.equal(result, true, "Airline should be able to register another airline");
+    });
+
+
+  it('(airline) cannot register an Airline using registerAirline() if not funded', async () => {
+    
+    // ARRANGE
+    let newAirline = accounts[4];
+    let notFundedAirline = accounts[5];
+    await config.flightSuretyApp.registerAirline(notFundedAirline, {from:config.firstAirline})
+    // ACT
+    try {
+        await config.flightSuretyApp.registerAirline(newAirline, {from: notFundedAirline});
     }
     catch(e) {
-
+      console.log(e)
     }
     let result = await config.flightSuretyData.isAirline.call(newAirline); 
 
