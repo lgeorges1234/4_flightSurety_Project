@@ -14,7 +14,6 @@ contract FlightSuretyData {
     bool private operational = true;        // Blocks all state changes throughout the contract if false
 
     uint256 private totalBalance;           // total of funds raised by companies
-    
 
     struct Airline {
         address airline;
@@ -22,16 +21,18 @@ contract FlightSuretyData {
         bool funded;
     }
 
-
-    mapping (address => Airline) private Airlines;
-
-
-
+    mapping (address => Airline) Airlines;
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
 
+    event AirlineWasRegistered(address airline, bool registered);
+    event AirlineWasFunded(address airline, uint256 amount, bool funded);
+
+    /********************************************************************************************/
+    /*                                         CONSTRUCTOR                                      */
+    /********************************************************************************************/
 
     /**
     * @dev Constructor
@@ -129,6 +130,7 @@ contract FlightSuretyData {
                             returns(bool)
     {
         Airlines[_airline] = Airline({airline: _airline, registered: true, funded: false});
+        emit AirlineWasRegistered(_airline, Airlines[_airline].registered);
     }
 
     function submitFundsAirline
@@ -137,6 +139,7 @@ contract FlightSuretyData {
                                 uint256 _amount
                             )
                             external
+                            payable
                             requireIsOperational
 
     {
@@ -150,6 +153,7 @@ contract FlightSuretyData {
         require(totalBalance.sub(beforeBalance) == _amount, "Funds have not been provided");
         // Mark the airline as "funded"
         Airlines[_airline] = Airline({airline: _airline, registered: true, funded: true});
+        emit AirlineWasFunded(_airline, _amount, Airlines[_airline].funded);
     }
 
 
@@ -157,7 +161,8 @@ contract FlightSuretyData {
                         (
                             address _airline 
                         )
-                        external
+                        external 
+                        view 
                         requireIsOperational
                         returns(bool)
     {
@@ -169,6 +174,7 @@ contract FlightSuretyData {
                             address _airline 
                         )
                         external
+                        view 
                         requireIsOperational
                         returns(bool)
     {
@@ -235,6 +241,7 @@ contract FlightSuretyData {
                             (
                             )
                             external
+                            view
                             returns(uint256)
     {
         return totalBalance;

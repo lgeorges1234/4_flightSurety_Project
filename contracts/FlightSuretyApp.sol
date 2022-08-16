@@ -19,7 +19,7 @@ contract FlightSuretyApp {
     /********************************************************************************************/
 
     // Data contract reference
-    FlightSuretyData flightSuretyData;
+    FlightSuretyData private flightSuretyData;
 
 
     // Flight status codees
@@ -87,17 +87,31 @@ contract FlightSuretyApp {
         _;
     }
 
+    modifier requireNotRegisteredAirline()
+    {
+        require(flightSuretyData.isAirline(msg.sender) == false, "Airline making the call is already registred");
+        _;
+    }
+
     modifier requireFundedAirline()
     {
         require(flightSuretyData.isFundedAirline(msg.sender) == true, "Airline making the call has not provided funds");
         _;
     }
 
+    modifier requireNotFundedAirline()
+    {
+        require(flightSuretyData.isFundedAirline(msg.sender) == false, "Airline making the call has already provided funds");
+        _;
+    }
+
+
     /********************************************************************************************/
     /*                                       EVENTS DECLARATION                                */
     /********************************************************************************************/
 
-    event LogFunctionFlow(string);
+    event AirlineWasRegisteredApp(address airline);
+    event AirlineWasFundedApp(address airline, uint256 amount);
 
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
@@ -148,21 +162,9 @@ contract FlightSuretyApp {
                                     returns(bool)
     {
         flightSuretyData.registerAirline(_airline);
+        emit AirlineWasRegisteredApp(_airline);
         return flightSuretyData.isAirline(_airline);
     }
-
-    // function fundFirstAirline 
-    //                                 (
-    //                                     address _firstAirline,
-    //                                     uint256 _amount
-    //                                 )
-    //                                 requireContractOwner
-    //                                 returns(bool)
-    // {
-    //     require(msg.value == AIRLINE_REGISTRATION_FEE, "You must provide enough Ethers to fund the seed");
-    //     flightSuretyData.submitFundsAirline(_firstAirline, AIRLINE_REGISTRATION_FEE);
-    //     return flightSuretyData.isFundedAirline(_firstAirline);
-    // }
 
        /**
     * @dev Add an airline to the registration queue
@@ -173,25 +175,32 @@ contract FlightSuretyApp {
                             (
                                 address _airline   
                             )
-                            external
+                            public
                             requireIsOperational
                             requireRegisteredAirline
+                            requireFundedAirline
                             returns(bool success, uint256 votes)
     {
         flightSuretyData.registerAirline(_airline);
+        emit AirlineWasRegisteredApp(_airline);
         return (flightSuretyData.isAirline(_airline), 0);
     }
 
-    function submitFundsAirline()
-                                external
+
+    function submitFundsAirline
+                                (
+                                )
+                                public
                                 payable
                                 requireIsOperational
                                 requireRegisteredAirline
+                                requireNotFundedAirline
                                 requireEnoughFunds
                                 returns(bool succes)
     {
         // pass registration fees to data contract to allow the airline to fund the seed.
         flightSuretyData.submitFundsAirline(msg.sender, AIRLINE_REGISTRATION_FEE);
+        emit AirlineWasFundedApp(msg.sender, AIRLINE_REGISTRATION_FEE);
         return (flightSuretyData.isFundedAirline(msg.sender));
     }
 

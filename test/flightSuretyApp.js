@@ -77,66 +77,81 @@ contract('Flight Surety App Tests ', async (accounts) => {
   it('(contractOwner) can register the first Airline using registerAirline()', async () => {
     
     // ARRANGE
-
+    let registerFirstAirlineResult;
     // ACT
     try {
-      await config.flightSuretyApp.registerFirstAirline.call(config.firstAirline, {from: config.owner});
-      }
+      registerFirstAirlineResult = await config.flightSuretyApp.registerFirstAirline(config.firstAirline, {from: config.owner});
+    }
     catch(e) {
 
     }
     let result = await config.flightSuretyData.isAirline.call(config.firstAirline);
     // ASSERT
     assert.equal(result, true, "ContractOwner should be able to register the first airline");
-
+    assert.equal(registerFirstAirlineResult.logs[0].event , "AirlineWasRegisteredApp", "Event AirlineWasRegisteredApp was not emitted");
   });
 
-  it('(airline) can fund the airline when registered using submitFundsAirline()', async () => {
+
+  it('(airline) can fund the firstAirline using submitFundsAirline()', async () => {
+
     
     // ARRANGE
+    let submitFundsResult;
     let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
-    console.log(contractBalanceBefore.toString())
-    let re = await config.flightSuretyData.isFundedAirline.call(config.firstAirline); 
-    console.log(`data isFundedAirline before: ${re}`)
     // ACT
     try {
-
+      submitFundsResult = await config.flightSuretyApp.submitFundsAirline({from: config.firstAirline, value:AIRLINE_REGISTRATION_FEE});
     }
     catch(e) {
 
     }
 
-    let res = await config.flightSuretyApp.submitFundsAirline.call({from: config.firstAirline, value:AIRLINE_REGISTRATION_FEE});
-    console.log(`app submitFundsAirline return: ${res}`)
-
     let result = await config.flightSuretyData.isFundedAirline.call(config.firstAirline); 
-    console.log(`data isFundedAirline after: ${result}`)
+    
     let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
-    console.log(contractBalanceAfter.toString())
     // ASSERT
     assert.equal(result, true, "Airline should be able to fund the contract");
-
+    assert.equal(contractBalanceAfter - contractBalanceBefore, AIRLINE_REGISTRATION_FEE, "Balance has not been increased from funds")
+    assert.equal(submitFundsResult.logs[0].event , "AirlineWasFundedApp", "Event AirlineWasFundedApp was not emitted");
   });
 
     it('(airline) can register an Airline using registerAirline()', async () => {
     
       // ARRANGE
+      let registerResult;
       let newAirline = accounts[2];
-      await config.flightSuretyApp.submitFundsAirline.call({from: config.firstAirline, value:AIRLINE_REGISTRATION_FEE});
-
       // ACT
       try {
-        await config.flightSuretyApp.registerAirline(newAirline, {from: config.firstAirline});
+        registerResult = await config.flightSuretyApp.registerAirline(newAirline, {from: config.firstAirline});
         }
-      catch(e) {
-
+      catch(e) {      
       }
+
       let result = await config.flightSuretyData.isAirline.call(newAirline); 
 
-  
       // ASSERT
       assert.equal(result, true, "Airline should be able to register another airline");
+      assert.equal(registerResult.logs[0].event , "AirlineWasRegisteredApp", "Event AirlineWasFundedApp was not emitted");
     });
+
+
+    it('(airline) cannot register an Airline using registerAirline() if not registered', async () => {
+    
+      // ARRANGE
+      let newAirline = accounts[6];
+      let notRegisteredAirline = accounts[7];
+      
+      // ACT
+      try {
+        await config.flightSuretyApp.registerAirline(newAirline, {from:notRegisteredAirline})
+      }
+      catch(e) {
+      }
+      let result = await config.flightSuretyData.isAirline.call(newAirline); 
+  
+      // ASSERT
+      assert.equal(result, false, "Airline should not be able to register another airline if it is not registered");
+    })
 
 
   it('(airline) cannot register an Airline using registerAirline() if not funded', async () => {
@@ -145,12 +160,12 @@ contract('Flight Surety App Tests ', async (accounts) => {
     let newAirline = accounts[4];
     let notFundedAirline = accounts[5];
     await config.flightSuretyApp.registerAirline(notFundedAirline, {from:config.firstAirline})
+
     // ACT
     try {
         await config.flightSuretyApp.registerAirline(newAirline, {from: notFundedAirline});
     }
     catch(e) {
-      console.log(e)
     }
     let result = await config.flightSuretyData.isAirline.call(newAirline); 
 
@@ -159,5 +174,4 @@ contract('Flight Surety App Tests ', async (accounts) => {
 
   });
  
-
 });
