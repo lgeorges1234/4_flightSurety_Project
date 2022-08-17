@@ -14,6 +14,7 @@ contract FlightSuretyData {
     bool private operational = true;        // Blocks all state changes throughout the contract if false
 
     uint256 private totalBalance;           // total of funds raised by companies
+    uint256 private totalAirlines;           // totalt number of registered airlines
 
     struct Airline {
         address airline;
@@ -45,6 +46,7 @@ contract FlightSuretyData {
     {
         contractOwner = msg.sender;
         contractAddress = address(this);
+        totalAirlines = 0;
     }
 
     /********************************************************************************************/
@@ -130,6 +132,7 @@ contract FlightSuretyData {
                             returns(bool)
     {
         Airlines[_airline] = Airline({airline: _airline, registered: true, funded: false});
+        totalAirlines = totalAirlines.add(1);
         emit AirlineWasRegistered(_airline, Airlines[_airline].registered);
     }
 
@@ -181,6 +184,15 @@ contract FlightSuretyData {
         return Airlines[_airline].funded;
     }
 
+    function howManyRegisteredAirlines 
+                        ()
+                        external
+                        view
+                        requireIsOperational 
+                        returns(uint256)
+    {
+        return totalAirlines;
+    }
 
    /**
     * @dev Buy insurance for a flight

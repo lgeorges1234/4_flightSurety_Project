@@ -21,6 +21,8 @@ contract FlightSuretyApp {
     // Data contract reference
     FlightSuretyData private flightSuretyData;
 
+    // Address used to deploy contract
+    address private contractOwner;        
 
     // Flight status codees
     uint8 private constant STATUS_CODE_UNKNOWN = 0;
@@ -30,20 +32,25 @@ contract FlightSuretyApp {
     uint8 private constant STATUS_CODE_LATE_TECHNICAL = 40;
     uint8 private constant STATUS_CODE_LATE_OTHER = 50;
 
-    // Account used to deploy contract
-    address private contractOwner;        
 
     // Amount of funding
     uint256 public constant FLIGHT_INSURANCE_AMOUNT = 1 ether;
     uint256 public constant AIRLINE_REGISTRATION_FEE = 10 ether;
 
+    // Array to keep records of voters
+    // address[] multiCalls = new address[](0);
 
+    // Mapping to keep records of airlines voters per airline
+    mapping(address => address[]) multiCallsAirlines;
+
+    // flight structure
     struct Flight {
         bool isRegistered;
         uint8 statusCode;
         uint256 updatedTimestamp;        
         address airline;
     }
+    // mapping of all flights recorded
     mapping(bytes32 => Flight) private flights;
 
 
@@ -105,6 +112,19 @@ contract FlightSuretyApp {
         _;
     }
 
+    modifier requireHasNotVoted(address[] multiCalls)
+    {
+        bool isDuplicate = false;
+        for(uint c=0; c<multiCalls.length; c++) {
+            if (multiCalls[c] == msg.sender) {
+                isDuplicate = true;
+                _;
+            }
+        }
+        require(!isDuplicate, "Caller has already called this function");
+        _;
+    }
+
 
     /********************************************************************************************/
     /*                                       EVENTS DECLARATION                                */
@@ -112,6 +132,7 @@ contract FlightSuretyApp {
 
     event AirlineWasRegisteredApp(address airline);
     event AirlineWasFundedApp(address airline, uint256 amount);
+    event AirlineHasOneMoreVote(address airline, uint256 vote);
 
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
@@ -142,6 +163,34 @@ contract FlightSuretyApp {
                             returns(bool) 
     {
         return flightSuretyData.isOperational();  // call data contract's status
+    }
+
+    function calculThreshold 
+                            (
+                                uint256 numberOfVoters
+                            )
+                            returns(uint256 number)
+    {
+        uint256 threshold = numberOfVoters.div(2);
+        if(numberOfVoters % 2 ==1) {
+            return threshold.add(1);
+        } else {
+            return threshold;
+        }
+    }
+
+    function hasEnoughVotes
+                            (
+                            address[] multiCalls,
+                            uint256 threshold
+                            )
+                            returns(bool)
+    {
+        if (multiCalls.length >= threshold) {
+            return true;    
+        } else {
+            return false;
+        }
     }
 
     /********************************************************************************************/
@@ -179,11 +228,28 @@ contract FlightSuretyApp {
                             requireIsOperational
                             requireRegisteredAirline
                             requireFundedAirline
+                            requireHasNotVoted(multiCallsAirlines[_airline])
                             returns(bool success, uint256 votes)
     {
-        flightSuretyData.registerAirline(_airline);
-        emit AirlineWasRegisteredApp(_airline);
-        return (flightSuretyData.isAirline(_airline), 0);
+        bool canBeRegistered =  false;
+        uint256 threshold =  calculThreshold(flightSuretyData.howManyRegisteredAirlines());
+        if(flightSuretyData.howManyRegisteredAirlines() >= 4) {
+            multiCallsAirlines[_airline].push(msg.sender);
+            uint256 votesNumber = multiCallsAirlines[_airline].length;
+            emit AirlineHasOneMoreVote(msg.sender, votesNumber);
+            
+            if(hasEnoughVotes(multiCallsAirlines[_airline], threshold)){
+                multiCallsAirlines[_airline] = new address[](0);  
+                canBeRegistered =  true;
+            }     
+        } else {
+            canBeRegistered =  true;
+        }
+        if(canBeRegistered){
+            flightSuretyData.registerAirline(_airline);
+            emit AirlineWasRegisteredApp(_airline);
+        }
+        return (flightSuretyData.isAirline(_airline), votesNumber);
     }
 
 
