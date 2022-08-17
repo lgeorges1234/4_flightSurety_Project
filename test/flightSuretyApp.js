@@ -177,18 +177,23 @@ contract('Flight Surety App Tests ', async (accounts) => {
   it('(airline) cannnot register a new airline using registerAirline() if it has not a majority of votes', async () => {
     
     // ARRANGE
+    // accounts[1], accounts[2], accounts[6] are already registered from previous tests
     let airlineTwo = accounts[2];
     let airlineThree = accounts[3];
     let airlineFour= accounts[6];
     let airlineHasToBeValidated = accounts[7];
 
+    // register a fourth account - accounts[3] - that has not been registered
     await config.flightSuretyApp.registerAirline(airlineThree, {from:config.firstAirline});
 
+    // fund each account
     await config.flightSuretyApp.submitFundsAirline({from: airlineTwo, value:AIRLINE_REGISTRATION_FEE});
     await config.flightSuretyApp.submitFundsAirline({from: airlineThree, value:AIRLINE_REGISTRATION_FEE});
     await config.flightSuretyApp.submitFundsAirline({from: airlineFour, value:AIRLINE_REGISTRATION_FEE});
 
     // ACT
+
+    // register the airline with only one registered airline
     try {
       await config.flightSuretyApp.registerAirline(airlineHasToBeValidated, {from:config.firstAirline});
     }
@@ -196,7 +201,6 @@ contract('Flight Surety App Tests ', async (accounts) => {
 
     }
 
-    
     let howManyRegisteredAirlinesResult = await config.flightSuretyData.howManyRegisteredAirlines();
     let isRegisteredResult = await config.flightSuretyData.isAirline.call(airlineHasToBeValidated); 
 
@@ -208,58 +212,42 @@ contract('Flight Surety App Tests ', async (accounts) => {
   it('(airline) cannnot register a new airline using registerAirline() if the voter has already voted', async () => {
     
     // ARRANGE
-    let airlineTwo = accounts[2];
-    let airlineThree = accounts[3];
-    let airlineFour= accounts[6];
+    // accounts[1], accounts[2], accounts[6], accounts[6] are already registered and funded from previous tests
     let airlineHasToBeValidated = accounts[7];
 
+    // initialize variables to check the revert msg
     let hasAlreadyVoted = false;
+    let message;
 
     // ACT
+    // try to register with first airline
     try {
       await config.flightSuretyApp.registerAirline(airlineHasToBeValidated, {from:config.firstAirline});
     }
     catch(e) {
       hasAlreadyVoted = true;
+      message = e;
     }
 
     let howManyRegisteredAirlinesResult = await config.flightSuretyData.howManyRegisteredAirlines();
     let isRegisteredResult = await config.flightSuretyData.isAirline.call(airlineHasToBeValidated); 
 
     // ASSERT
-    assert.equal(hasAlreadyVoted, true, "Airline should not be able to vote a second time")
-    assert.equal(isRegisteredResult, false, "Airline should have not been registered")
+    assert.equal(hasAlreadyVoted, true, message);
+    assert.equal(isRegisteredResult, false, "Airline should have not been registered");
     assert.equal(howManyRegisteredAirlinesResult, 4, "Airline registered number should not be increased by one");
   });
 
   it('(airline) needs majority of votes to register a new airline using registerAirline()', async () => {
     
     // ARRANGE
+    // accounts[1], accounts[2], accounts[6], accounts[6] are already registered and funded from previous tests
     let airlineTwo = accounts[2];
-    let airlineThree = accounts[3];
-    let airlineFour= accounts[6];
     let airlineHasToBeValidated = accounts[8];
 
+    // initialize two variables to get the registerAirline result events
     let voteIncrease1;
     let voteIncrease2;
-    let voteIncrease3;
-
-    // await config.flightSuretyApp.registerAirline(airlineTwo, {from:config.firstAirline});
-    // await config.flightSuretyApp.registerAirline(airlineThree, {from:config.firstAirline});
-    // await config.flightSuretyApp.registerAirline(airlineFour, {from:config.firstAirline});
-
-    // console.log(await config.flightSuretyData.isAirline.call(airlineTwo))
-    // console.log(await config.flightSuretyData.isAirline.call(airlineThree))
-    // console.log(await config.flightSuretyData.isAirline.call(airlineFour))
-
-    // await config.flightSuretyApp.submitFundsAirline({from: airlineTwo, value:AIRLINE_REGISTRATION_FEE});
-    // await config.flightSuretyApp.submitFundsAirline({from: airlineThree, value:AIRLINE_REGISTRATION_FEE});
-    // await config.flightSuretyApp.submitFundsAirline({from: airlineFour, value:AIRLINE_REGISTRATION_FEE});
-
-    // console.log(await config.flightSuretyData.isFundedAirline.call(airlineTwo))
-    // console.log(await config.flightSuretyData.isFundedAirline.call(airlineThree))
-    // console.log(await config.flightSuretyData.isFundedAirline.call(airlineFour))
-
 
     // ACT
     try {
@@ -276,6 +264,9 @@ contract('Flight Surety App Tests ', async (accounts) => {
     // ASSERT
     assert.equal(result, true, "Airline has not obtained enough votes");
     assert.equal(howManyRegisteredAirlinesResult, 5, "Airline registered number should not be increased by one");
+    assert.equal(voteIncrease1.logs[0].event , "AirlineHasOneMoreVote", "Event AirlineHasOneMoreVote was not emitted");
+    assert.equal(voteIncrease2.logs[0].event , "AirlineHasOneMoreVote", "Event AirlineHasOneMoreVote was not emitted");
+    assert.equal(voteIncrease2.logs[1].event , "AirlineWasRegisteredApp", "Event AirlineWasFundedApp was not emitted");
   });
 
 

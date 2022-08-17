@@ -165,6 +165,10 @@ contract FlightSuretyApp {
         return flightSuretyData.isOperational();  // call data contract's status
     }
 
+   /**
+    * @dev returns the number of voters divided by 2
+    *
+    */ 
     function calculThreshold 
                             (
                                 uint256 numberOfVoters
@@ -172,13 +176,17 @@ contract FlightSuretyApp {
                             returns(uint256 number)
     {
         uint256 threshold = numberOfVoters.div(2);
-        if(numberOfVoters % 2 ==1) {
+        if(numberOfVoters % 2 == 1) {
             return threshold.add(1);
         } else {
             return threshold;
         }
     }
 
+   /**
+    * @dev test if enough votes have been collected given a threshold
+    *
+    */ 
     function hasEnoughVotes
                             (
                             address[] multiCalls,
@@ -199,7 +207,7 @@ contract FlightSuretyApp {
 
   
    /**
-    * @dev allow contracts owner to register and fund the registration
+    * @dev allow contracts owner to register and fund the registration of a first airline
     *
     */   
 
@@ -231,25 +239,34 @@ contract FlightSuretyApp {
                             requireHasNotVoted(multiCallsAirlines[_airline])
                             returns(bool success, uint256 votes)
     {
+        // initialize a variable to simplifie the if statement and avoid redundant code
         bool canBeRegistered =  false;
+        // calculate vote threshold according to the number of registered airlines
         uint256 threshold =  calculThreshold(flightSuretyData.howManyRegisteredAirlines());
+        // test if the number of registered airlines exceed 4
         if(flightSuretyData.howManyRegisteredAirlines() >= 4) {
+            // add the voter to the airline's list of voters 
             multiCallsAirlines[_airline].push(msg.sender);
-            uint256 votesNumber = multiCallsAirlines[_airline].length;
-            emit AirlineHasOneMoreVote(msg.sender, votesNumber);
+            // emit an event to keep trace of the number of votes
+            emit AirlineHasOneMoreVote(msg.sender, multiCallsAirlines[_airline].length);
             
+            // check if the number of votes have reached the threshold
             if(hasEnoughVotes(multiCallsAirlines[_airline], threshold)){
+                // reset the array of voters of the newly registered airline
                 multiCallsAirlines[_airline] = new address[](0);  
                 canBeRegistered =  true;
             }     
         } else {
             canBeRegistered =  true;
         }
+        // register the airline and emit the according event if requirements are met
         if(canBeRegistered){
+            // ensure that the number of votes have been set to 0 
+            require(multiCallsAirlines[_airline].length == 0, "number of votes should be set to )");
             flightSuretyData.registerAirline(_airline);
             emit AirlineWasRegisteredApp(_airline);
         }
-        return (flightSuretyData.isAirline(_airline), votesNumber);
+        return (flightSuretyData.isAirline(_airline), multiCallsAirlines[_airline].length);
     }
 
 
