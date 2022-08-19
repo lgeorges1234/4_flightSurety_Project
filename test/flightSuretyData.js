@@ -76,44 +76,91 @@ contract('Flight Surety Data Tests', async (accounts) => {
   it('(airline) can register an Airline using registerAirline()', async () => {
     
     // ARRANGE
+    let result;
     let newAirline = accounts[2];
 
     // ACT
     try {
-        await config.flightSuretyData.registerAirline(newAirline, {from: config.firstAirline});
+        result = await config.flightSuretyData.registerAirline(newAirline, {from: config.firstAirline});
       }
     catch(e) {
 
     }
-    let result = await config.flightSuretyData.isAirline.call(newAirline); 
+    let isRegisteredResult = await config.flightSuretyData.isAirline.call(newAirline); 
     // ASSERT
-    assert.equal(result, true, "Airline should be able to register another airline");
+    assert.equal(isRegisteredResult, true, "Airline should be able to register another airline");
+    assert.equal(result.logs[0].event, "AirlineWasRegistered", "Event funded has not been emitted");
+  });
+
+  it('() can fund FlightSuretyData contract using fund()', async () => {
+    
+    // ARRANGE
+    let result;
+    let newAirline = accounts[3];
+    let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
+    await config.flightSuretyData.registerAirline(newAirline, {from: config.firstAirline}); 
+    // ACT
+    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    console.log(contractBalanceBefore.toString());
+    try {
+        result = await config.flightSuretyData.fund(newAirline, AIRLINE_REGISTRATION_FEE, {from: newAirline});
+      }
+    catch(e) {
+
+    }
+    // console.log(result.logs[0])
+    let contractBalanceAfter = await config.flightSuretyData.getBalance.call(); 
+    console.log(contractBalanceAfter.toString());
+    // ASSERT
+    assert.equal(contractBalanceAfter-contractBalanceBefore, AIRLINE_REGISTRATION_FEE, "Airline funds have not been collected")
+    assert.equal(result.logs[0].event, "funded", "Event funded has not been emitted");
   });
 
   it('(airline) can fund their registration using submitFundsAirline', async () => {
     
     // ARRANGE
+    let result;
     let newAirline = accounts[2];
     let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
-    await config.flightSuretyData.registerAirline(newAirline, {from: config.firstAirline}); 
     // ACT
     let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
     try {
-        await config.flightSuretyData.submitFundsAirline(newAirline, AIRLINE_REGISTRATION_FEE, {from: newAirline});
+        result = await config.flightSuretyData.submitFundsAirline(newAirline, AIRLINE_REGISTRATION_FEE, {from: newAirline});
     }
     catch(e) {
 
     }
     let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
 
-    let result = await config.flightSuretyData.isFundedAirline.call(newAirline); 
+    let isFundedResult = await config.flightSuretyData.isFundedAirline.call(newAirline); 
 
     // ASSERT
-    assert.equal(result, true, "Airline has not been marked as funded");
+    assert.equal(isFundedResult, true, "Airline has not been marked as funded");
     assert.equal(contractBalanceAfter-contractBalanceBefore, AIRLINE_REGISTRATION_FEE, "Airline funds have not been collected")
+    assert.equal(result.logs[1].event, "AirlineWasFunded", "Event funded has not been emitted");
   });
  
+  it('(airline) can register a flight using registerFlight()', async () => {
+    
+    // ARRANGE
+    let result;
+    let airline = accounts[2];
+    let flight = 'ND1309'; // Course number
+    let timestamp= Math.floor(Date.now() / 1000);
+    // ACT
+    try {
+        result = await config.flightSuretyData.registerFlight(flight, timestamp , 0, airline);
+      }
+    catch(e) {
 
+    }
+    let isRegisterResult = await config.flightSuretyData.isFlight.call(flight, timestamp, airline); 
+    let hasStatusResult = await config.flightSuretyData.viewFlightSatus.call(flight, airline, timestamp); 
+    // ASSERT
+    assert.equal(isRegisterResult, true, "Airline should be able to register a flight");
+    assert.equal(hasStatusResult, 0, "Just registered airline should have a '0' status");
+    assert.equal(result.logs[0].event, "FlightWasRegistered", "Event funded has not been emitted");
+  });
 
 
 });

@@ -8,19 +8,20 @@ import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 import "./FlightSuretyData.sol";
 
+
+
 /************************************************** */
 /* FlightSurety Smart Contract                      */
 /************************************************** */
 contract FlightSuretyApp {
     using SafeMath for uint256; // Allow SafeMath functions to be called for all uint256 types (similar to "prototype" in Javascript)
-
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
 
     // Data contract reference
     FlightSuretyData private flightSuretyData;
-
+    address flightSuretyDataContractAddress;
     // Address used to deploy contract
     address private contractOwner;        
 
@@ -36,9 +37,6 @@ contract FlightSuretyApp {
     // Amount of funding
     uint256 public constant FLIGHT_INSURANCE_AMOUNT = 1 ether;
     uint256 public constant AIRLINE_REGISTRATION_FEE = 10 ether;
-
-    // Array to keep records of voters
-    // address[] multiCalls = new address[](0);
 
     // Mapping to keep records of airlines voters per airline
     mapping(address => address[]) multiCallsAirlines;
@@ -94,11 +92,11 @@ contract FlightSuretyApp {
         _;
     }
 
-    modifier requireNotRegisteredAirline()
-    {
-        require(flightSuretyData.isAirline(msg.sender) == false, "Airline making the call is already registred");
-        _;
-    }
+    // modifier requireNotRegisteredAirline()
+    // {
+    //     require(flightSuretyData.isAirline(msg.sender) == false, "Airline making the call is already registred");
+    //     _;
+    // }
 
     modifier requireFundedAirline()
     {
@@ -106,11 +104,11 @@ contract FlightSuretyApp {
         _;
     }
 
-    modifier requireNotFundedAirline()
-    {
-        require(flightSuretyData.isFundedAirline(msg.sender) == false, "Airline making the call has already provided funds");
-        _;
-    }
+    // modifier requireNotFundedAirline()
+    // {
+    //     require(flightSuretyData.isFundedAirline(msg.sender) == false, "Airline making the call has already provided funds");
+    //     _;
+    // }
 
     modifier requireHasNotVoted(address[] multiCalls)
     {
@@ -133,6 +131,7 @@ contract FlightSuretyApp {
     event AirlineWasRegisteredApp(address airline);
     event AirlineWasFundedApp(address airline, uint256 amount);
     event AirlineHasOneMoreVote(address airline, uint256 vote);
+    event FlightWasRegisteredApp(string _flightName, uint256 _timeStamp, address _airline);
 
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
@@ -150,6 +149,7 @@ contract FlightSuretyApp {
                                 public 
     {
         contractOwner = msg.sender;
+        flightSuretyDataContractAddress = _dataContract;
         flightSuretyData = FlightSuretyData(_dataContract);
         registerFirstAirline(_firstAirline);
     }
@@ -262,7 +262,7 @@ contract FlightSuretyApp {
         // register the airline and emit the according event if requirements are met
         if(canBeRegistered){
             // ensure that the number of votes have been set to 0 
-            require(multiCallsAirlines[_airline].length == 0, "number of votes should be set to )");
+            require(multiCallsAirlines[_airline].length == 0, "number of votes should be set to 0");
             flightSuretyData.registerAirline(_airline);
             emit AirlineWasRegisteredApp(_airline);
         }
@@ -276,12 +276,11 @@ contract FlightSuretyApp {
                                 public
                                 payable
                                 requireIsOperational
-                                requireRegisteredAirline
-                                requireNotFundedAirline
                                 requireEnoughFunds
                                 returns(bool succes)
     {
         // pass registration fees to data contract to allow the airline to fund the seed.
+        // contractOwner.transfer(100000000000);
         flightSuretyData.submitFundsAirline(msg.sender, AIRLINE_REGISTRATION_FEE);
         emit AirlineWasFundedApp(msg.sender, AIRLINE_REGISTRATION_FEE);
         return (flightSuretyData.isFundedAirline(msg.sender));
@@ -294,11 +293,17 @@ contract FlightSuretyApp {
     */  
     function registerFlight
                                 (
+                                    string _flightName,
+                                    uint256 _timeStamp
                                 )
+                                requireRegisteredAirline
+                                requireFundedAirline
                                 external
-                                pure
+                                returns(bool success)
     {
-
+        flightSuretyData.registerFlight(_flightName, _timeStamp, STATUS_CODE_UNKNOWN, msg.sender);
+        emit FlightWasRegisteredApp(_flightName, _timeStamp, msg.sender);
+        return flightSuretyData.isFlight(_flightName, _timeStamp, msg.sender);
     }
     
    /**

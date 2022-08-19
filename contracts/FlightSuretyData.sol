@@ -1,9 +1,11 @@
 pragma solidity ^0.4.25;
 
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
 contract FlightSuretyData {
     using SafeMath for uint256;
+    ERC20 erc20;
 
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
@@ -13,43 +15,30 @@ contract FlightSuretyData {
     address private contractAddress;
     bool private operational = true;        // Blocks all state changes throughout the contract if false
 
-    uint256 private totalBalance;           // total of funds raised by companies
-    uint256 private totalAirlines;           // totalt number of registered airlines
+    uint256 private totalBalance = 0;       // total of funds raised by companies
+    uint256 private totalAirlines = 0;      // totalt number of registered airlines
 
     struct Airline {
         address airline;
         bool registered;
         bool funded;
+        bytes32[] flight;
     }
 
     mapping (address => Airline) Airlines;
 
-    /********************************************************************************************/
-    /*                                       EVENT DEFINITIONS                                  */
-    /********************************************************************************************/
-
-    event AirlineWasRegistered(address airline, bool registered);
-    event AirlineWasFunded(address airline, uint256 amount, bool funded);
-
-    /********************************************************************************************/
-    /*                                         CONSTRUCTOR                                      */
-    /********************************************************************************************/
-
-    /**
-    * @dev Constructor
-    *      The deploying account becomes contractOwner
-    */
-    constructor
-                                (
-                                ) 
-                                public 
-    {
-        contractOwner = msg.sender;
-        contractAddress = address(this);
-        totalAirlines = 0;
+    // flight structure
+    struct Flight {
+        bytes32 flightsID;
+        bool isRegistered;
+        uint8 statusCode;
+        uint256 updatedTimestamp;   
+        address airline;     
     }
 
-    /********************************************************************************************/
+    mapping (bytes32 => Flight) Flights;
+
+/********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
     /********************************************************************************************/
 
@@ -76,11 +65,56 @@ contract FlightSuretyData {
         _;
     }
 
-    modifier requireIsRegistered(address airline)
+    modifier requireIsRegistered(address _airline)
     {
-        require(Airlines[airline].registered == true);
+        require(Airlines[_airline].registered == true, "Airline is not registered");
         _;
     }
+
+    modifier requireIsNotRegistered(address _airline)
+    {
+        require(Airlines[_airline].registered == false, "Airline is already registered");
+        _;
+    }
+    modifier requireIsNotFunded(address _airline)
+    {
+        require(Airlines[_airline].funded == false, "Airline is already funded");
+        _;
+    }
+
+    modifier requireIsFlightRegistered(address _airline)
+    {
+        require(Airlines[_airline].registered == true, "Airline is not registered");
+        _;
+    }
+
+    /********************************************************************************************/
+    /*                                       EVENT DECLARATION                                */
+    /********************************************************************************************/
+
+    event AirlineWasRegistered(address airline, bool registered);
+    event AirlineWasFunded(address airline, uint256 amount, bool funded);
+    event funded(address airline, address contractAddress, uint256 amount);
+    event FlightWasRegistered(bytes32 _flightID, string _flightName, uint256 _timeStamp, uint8 _statusCode, address _airline);
+
+    /********************************************************************************************/
+    /*                                         CONSTRUCTOR                                      */
+    /********************************************************************************************/
+
+    /**
+    * @dev Constructor
+    *      The deploying account becomes contractOwner
+    */
+    constructor
+                                (
+                                ) 
+                                public 
+    {
+        contractOwner = msg.sender;
+        contractAddress = address(this);
+        totalAirlines = 0;
+    }
+
 
     /********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
@@ -129,9 +163,11 @@ contract FlightSuretyData {
                             )
                             external
                             requireIsOperational
-                            returns(bool)
+                            requireIsNotRegistered(_airline)
     {
-        Airlines[_airline] = Airline({airline: _airline, registered: true, funded: false});
+        Airlines[_airline].airline = _airline;
+        Airlines[_airline].registered = true;
+        Airlines[_airline].funded = false;
         totalAirlines = totalAirlines.add(1);
         emit AirlineWasRegistered(_airline, Airlines[_airline].registered);
     }
@@ -144,6 +180,8 @@ contract FlightSuretyData {
                             external
                             payable
                             requireIsOperational
+                            requireIsRegistered(_airline)
+                            requireIsNotFunded(_airline)
 
     {
         // Store the actual balance of the contract
@@ -155,7 +193,9 @@ contract FlightSuretyData {
         // Check if the balance has been increased
         require(totalBalance.sub(beforeBalance) == _amount, "Funds have not been provided");
         // Mark the airline as "funded"
-        Airlines[_airline] = Airline({airline: _airline, registered: true, funded: true});
+        
+        // Airlines[_airline] = Airline({airline: _airline, registered: true, funded: true, flight: });
+        Airlines[_airline].funded = true;
         emit AirlineWasFunded(_airline, _amount, Airlines[_airline].funded);
     }
 
@@ -192,6 +232,56 @@ contract FlightSuretyData {
                         returns(uint256)
     {
         return totalAirlines;
+    }
+
+   /**
+    * @dev Add a flight to the registration queue
+    *      Can only be called from FlightSuretyApp contract
+    *
+    */ 
+
+    function registerFlight
+                            (   
+                                string _flightName,
+                                uint256 _timeStamp,
+                                uint8 _statusCode,
+                                address _airline
+                            )
+                            external
+                            requireIsOperational
+    {
+        bytes32 _flightID = getFlightKey(_airline, _flightName, _timeStamp);
+        Flights[_flightID] = Flight({flightsID: _flightID, isRegistered: true, statusCode: _statusCode, updatedTimestamp: _timeStamp, airline: _airline});
+        Airlines[_airline].flight.push(_flightID);
+        emit FlightWasRegistered(_flightID, _flightName, _timeStamp, _statusCode, _airline);
+    }
+
+    function isFlight 
+                        (
+                            string _flightName,
+                            uint256 _timeStamp,
+                            address _airline
+                        )
+                        external
+                        view 
+                        requireIsOperational
+                        returns(bool)
+    {
+        bytes32 _flightID = getFlightKey(_airline, _flightName, _timeStamp);
+        return Flights[_flightID].isRegistered;
+    }
+
+    function viewFlightSatus 
+                            (
+                                string _flightName,
+                                address _airline,
+                                uint256 _timeStamp                              
+                            )
+                            returns(uint256)
+    {
+        bytes32 _flightID = getFlightKey(_airline, _flightName, _timeStamp); 
+        require(Flights[_flightID].isRegistered == true, "Flight must first be registered before to get status");
+        return Flights[_flightID].statusCode;  
     }
 
    /**
@@ -241,10 +331,13 @@ contract FlightSuretyData {
                                 address _account,
                                 uint256 _amount
                             )
+                            public
                             payable
     {
         // Transfer the amount to the contract address
-        // contractAddress.transfer(_amount);
+        emit funded(_account, contractOwner, _amount);
+        // erc20.transferFrom(_account, contractOwner, _amount);
+        // contractOwner.transfer(_amount);
         // Increase the balance of the contract
         totalBalance = totalBalance.add(_amount);
     }
@@ -280,7 +373,7 @@ contract FlightSuretyData {
                             external 
                             payable 
     {
-        // fund(address, uint256);
+        fund(msg.sender, msg.value);
     }
 
 

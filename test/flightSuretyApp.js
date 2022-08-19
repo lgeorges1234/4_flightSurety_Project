@@ -269,5 +269,24 @@ contract('Flight Surety App Tests ', async (accounts) => {
     assert.equal(voteIncrease2.logs[1].event , "AirlineWasRegisteredApp", "Event AirlineWasFundedApp was not emitted");
   });
 
+  it('(airline) can register a flight using registerFlight()', async () => {
+    
+    // ARRANGE
+    let result;
+    let airline = accounts[3];
+    let flight = 'ND1309'; // Course number
+    let timestamp= Math.floor(Date.now() / 1000);
+    // ACT
+    try {
+      result = await config.flightSuretyApp.registerFlight(flight, timestamp, {from:airline})
+    }
+    catch(e) {
+    }
+    let isFlightResult = await config.flightSuretyData.isFlight.call(flight, timestamp, airline); 
+
+    // ASSERT
+    assert.equal(isFlightResult, true, "Flight has not been registered");
+    assert.equal(result.logs[0].event, "FlightWasRegisteredApp", "Event FlightWasRegisteredApp has not been emitted" )
+  })
 
 });
