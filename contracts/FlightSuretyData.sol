@@ -22,7 +22,7 @@ contract FlightSuretyData {
         address airline;
         bool registered;
         bool funded;
-        bytes32[] flight;
+        bytes32[] flightID;
     }
 
     mapping (address => Airline) Airlines;
@@ -34,9 +34,19 @@ contract FlightSuretyData {
         uint8 statusCode;
         uint256 updatedTimestamp;   
         address airline;     
+        bytes32[] insuranceID;
     }
 
     mapping (bytes32 => Flight) Flights;
+
+    struct Insurance {
+        bytes32 insuranceID;
+        bytes32 flightID;
+        address passenger;
+        uint256 value;
+    }
+
+    mapping (bytes32 => Insurance) Insurances;
 
 /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
@@ -96,6 +106,7 @@ contract FlightSuretyData {
     event AirlineWasFunded(address airline, uint256 amount, bool funded);
     event funded(address airline, address contractAddress, uint256 amount);
     event FlightWasRegistered(bytes32 _flightID, string _flightName, uint256 _timeStamp, uint8 _statusCode, address _airline);
+    event newInsurance(bytes32 insuranceID, string flightName, address passenger, uint256 value);
 
     /********************************************************************************************/
     /*                                         CONSTRUCTOR                                      */
@@ -165,13 +176,44 @@ contract FlightSuretyData {
                             requireIsOperational
                             requireIsNotRegistered(_airline)
     {
+        // Initiate airline into Airlines mapping
         Airlines[_airline].airline = _airline;
         Airlines[_airline].registered = true;
         Airlines[_airline].funded = false;
+        // Add 1 to the airline's count
         totalAirlines = totalAirlines.add(1);
+        // emit event
         emit AirlineWasRegistered(_airline, Airlines[_airline].registered);
     }
 
+    // Return true if an airline is registered
+    function isAirline 
+                        (
+                            address _airline 
+                        )
+                        external 
+                        view 
+                        requireIsOperational
+                        returns(bool)
+    {
+        return Airlines[_airline].registered;
+    }
+
+    // Return the number of registered airlines
+    function howManyRegisteredAirlines 
+                        ()
+                        external
+                        view
+                        requireIsOperational 
+                        returns(uint256)
+    {
+        return totalAirlines;
+    }
+
+   /**
+    * @dev Fund an airline
+    *
+    */   
     function submitFundsAirline
                             (   
                                 address _airline,
@@ -199,19 +241,7 @@ contract FlightSuretyData {
         emit AirlineWasFunded(_airline, _amount, Airlines[_airline].funded);
     }
 
-
-    function isAirline 
-                        (
-                            address _airline 
-                        )
-                        external 
-                        view 
-                        requireIsOperational
-                        returns(bool)
-    {
-        return Airlines[_airline].registered;
-    }
-
+    // Return true if an airline is funded
     function isFundedAirline 
                         (
                             address _airline 
@@ -224,18 +254,8 @@ contract FlightSuretyData {
         return Airlines[_airline].funded;
     }
 
-    function howManyRegisteredAirlines 
-                        ()
-                        external
-                        view
-                        requireIsOperational 
-                        returns(uint256)
-    {
-        return totalAirlines;
-    }
-
    /**
-    * @dev Add a flight to the registration queue
+    * @dev Add a flight 
     *      Can only be called from FlightSuretyApp contract
     *
     */ 
@@ -250,12 +270,23 @@ contract FlightSuretyData {
                             external
                             requireIsOperational
     {
+        // Get a unique 32 bytes ID to the flight given airline, flight name and timestamp
         bytes32 _flightID = getFlightKey(_airline, _flightName, _timeStamp);
-        Flights[_flightID] = Flight({flightsID: _flightID, isRegistered: true, statusCode: _statusCode, updatedTimestamp: _timeStamp, airline: _airline});
-        Airlines[_airline].flight.push(_flightID);
+        // Check if the flight has not been registered yet
+        require(Flights[_flightID].isRegistered == false, "Flight is already registered");
+        // Initiate flight into flight's mapping
+        Flights[_flightID].flightsID = _flightID;
+        Flights[_flightID].isRegistered = true;
+        Flights[_flightID].statusCode = _statusCode;
+        Flights[_flightID].updatedTimestamp = _timeStamp;
+        Flights[_flightID].airline = _airline;
+        // Add flight ID to Airline in airlines mapping
+        Airlines[_airline].flightID.push(_flightID);
+        // Emit event
         emit FlightWasRegistered(_flightID, _flightName, _timeStamp, _statusCode, _airline);
     }
 
+    // Return true if flight is registered
     function isFlight 
                         (
                             string _flightName,
@@ -271,6 +302,7 @@ contract FlightSuretyData {
         return Flights[_flightID].isRegistered;
     }
 
+    // Return status code of a flight
     function viewFlightSatus 
                             (
                                 string _flightName,
@@ -279,7 +311,9 @@ contract FlightSuretyData {
                             )
                             returns(uint256)
     {
+        // Get a unique 32 bytes ID to the flight given airline, flight name and timestamp
         bytes32 _flightID = getFlightKey(_airline, _flightName, _timeStamp); 
+        // Check if the flight is registered
         require(Flights[_flightID].isRegistered == true, "Flight must first be registered before to get status");
         return Flights[_flightID].statusCode;  
     }
@@ -288,13 +322,57 @@ contract FlightSuretyData {
     * @dev Buy insurance for a flight
     *
     */   
-    function buy
-                            (                             
+    function buyInsurance
+                            (   
+                                    string _flightName,
+                                    uint256 _timeStamp,
+                                    address _airline,
+                                    address _passenger,
+                                    uint256 _value                       
                             )
                             external
                             payable
     {
+        // Record account balance before it changes
+        uint256 beforeBalance = totalBalance;
+        // Get a unique 32 bytes ID to the flight given airline, flight name and timestamp
+        bytes32 _flightID = getFlightKey(_airline, _flightName, _timeStamp); 
+        // Check if the flight is registered
+        require(Flights[_flightID].isRegistered == true, "Flight is not registered");
+        // Get a unique 32 bytes ID to the insurance given flight id, passenger address and amount given.
+        bytes32 _insuranceID = getInsuranceKey(_flightID, _passenger, _value); 
+        // Fund contract with insurance
+        fund(_passenger, _value);
+        // Check if the balance has been increased
+        require(totalBalance.sub(beforeBalance) == _value, "Funds have not been provided");
+        // Initiate insurance in insurance mapping
+        Insurances[_insuranceID] = Insurance({insuranceID: _insuranceID, flightID: _flightID, passenger: _passenger, value: _value});
+        // Add insurance ID to flight in flights mapping
+        Flights[_flightID].insuranceID.push(_insuranceID);
+        // Emit event
+        emit newInsurance(_insuranceID, _flightName, _passenger, _value);
+    }
 
+    // return true if the passenger is insured for a flight
+    function isInsured
+                        (
+                            string _flightName,
+                            uint256 _timeStamp,
+                            address _airline,
+                            address _passenger,
+                            uint256 _value
+                        )
+                        returns(bool)
+    {
+        // Get a unique 32 bytes ID to the flight given airline, flight name and timestamp
+        bytes32 _flightID = getFlightKey(_airline, _flightName, _timeStamp); 
+        // Check if the flight is registered
+        require(Flights[_flightID].isRegistered == true, "Flight is not registered");
+        // Get a unique 32 bytes ID to the insurance given flight id, passenger address and amount given.
+        bytes32 _insuranceID = getInsuranceKey(_flightID, _passenger, _value);
+        // check if insurance has been initiate
+        if(Insurances[_insuranceID].passenger == _passenger) return true;   
+        return false;
     }
 
     /**
@@ -308,6 +386,18 @@ contract FlightSuretyData {
     {
     }
     
+    /**
+     *  @dev Buy insurance for a flight
+     *
+    */
+    function buy
+                            (
+                            )
+                            external
+                            pure
+    {
+    }
+
 
     /**
      *  @dev Transfers eligible payout funds to insuree
@@ -354,15 +444,28 @@ contract FlightSuretyData {
 
     function getFlightKey
                         (
-                            address airline,
-                            string memory flight,
-                            uint256 timestamp
+                            address _airline,
+                            string memory _flight,
+                            uint256 _timestamp
                         )
                         pure
                         internal
                         returns(bytes32) 
     {
-        return keccak256(abi.encodePacked(airline, flight, timestamp));
+        return keccak256(abi.encodePacked(_airline, _flight, _timestamp));
+    }
+
+        function getInsuranceKey
+                        (
+                            bytes32 _flightID,
+                            address _passenger,
+                            uint256 _value
+                        )
+                        pure
+                        internal
+                        returns(bytes32) 
+    {
+        return keccak256(abi.encodePacked(_flightID, _passenger, _value));
     }
 
     /**

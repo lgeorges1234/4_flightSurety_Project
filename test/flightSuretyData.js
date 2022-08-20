@@ -101,16 +101,16 @@ contract('Flight Surety Data Tests', async (accounts) => {
     await config.flightSuretyData.registerAirline(newAirline, {from: config.firstAirline}); 
     // ACT
     let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
-    console.log(contractBalanceBefore.toString());
+
     try {
         result = await config.flightSuretyData.fund(newAirline, AIRLINE_REGISTRATION_FEE, {from: newAirline});
       }
     catch(e) {
-
+      console.log(e)
     }
-    // console.log(result.logs[0])
+
     let contractBalanceAfter = await config.flightSuretyData.getBalance.call(); 
-    console.log(contractBalanceAfter.toString());
+
     // ASSERT
     assert.equal(contractBalanceAfter-contractBalanceBefore, AIRLINE_REGISTRATION_FEE, "Airline funds have not been collected")
     assert.equal(result.logs[0].event, "funded", "Event funded has not been emitted");
@@ -162,5 +162,35 @@ contract('Flight Surety Data Tests', async (accounts) => {
     assert.equal(result.logs[0].event, "FlightWasRegistered", "Event funded has not been emitted");
   });
 
+
+  it('(passenger) can buy an insurance using buyInsurance', async () => {
+    
+    // ARRANGE
+    let result;
+    let passenger = accounts[11];
+    let flight = 'ND1309'; // Course number
+    let timestamp= Math.floor(Date.now() / 1000);
+    let airline = accounts[3];
+    let INSURANCE_PRICE = web3.utils.toWei("1", "ether");
+
+    await config.flightSuretyData.registerFlight(flight, timestamp , 0, airline);
+
+    // ACT
+    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    try {
+        result = await config.flightSuretyData.buyInsurance(flight, timestamp, airline, passenger, INSURANCE_PRICE);
+      }
+    catch(e) {
+
+    }
+    let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
+
+    let isInsuranceBought = await config.flightSuretyData.isInsured.call(flight, timestamp, airline, passenger, INSURANCE_PRICE); 
+
+    // ASSERT
+    assert.equal(isInsuranceBought, true, "Insurance has not been bought");
+    assert.equal(contractBalanceAfter-contractBalanceBefore, INSURANCE_PRICE, "Airline funds have not been collected")
+    assert.equal(result.logs[1].event, "newInsurance", "Event newInsurance has not been emitted");
+  });
 
 });

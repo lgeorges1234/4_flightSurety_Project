@@ -92,23 +92,11 @@ contract FlightSuretyApp {
         _;
     }
 
-    // modifier requireNotRegisteredAirline()
-    // {
-    //     require(flightSuretyData.isAirline(msg.sender) == false, "Airline making the call is already registred");
-    //     _;
-    // }
-
     modifier requireFundedAirline()
     {
         require(flightSuretyData.isFundedAirline(msg.sender) == true, "Airline making the call has not provided funds");
         _;
     }
-
-    // modifier requireNotFundedAirline()
-    // {
-    //     require(flightSuretyData.isFundedAirline(msg.sender) == false, "Airline making the call has already provided funds");
-    //     _;
-    // }
 
     modifier requireHasNotVoted(address[] multiCalls)
     {
@@ -123,6 +111,10 @@ contract FlightSuretyApp {
         _;
     }
 
+    modifier requireRequiredValue() {
+        require(msg.value > 0 && msg.value <= FLIGHT_INSURANCE_AMOUNT, "You must provide enough Ethers to buy an insurance");
+        _;
+    }
 
     /********************************************************************************************/
     /*                                       EVENTS DECLARATION                                */
@@ -132,6 +124,7 @@ contract FlightSuretyApp {
     event AirlineWasFundedApp(address airline, uint256 amount);
     event AirlineHasOneMoreVote(address airline, uint256 vote);
     event FlightWasRegisteredApp(string _flightName, uint256 _timeStamp, address _airline);
+    event newInsuranceApp(string flightName, address passenger, uint256 value);
 
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
@@ -184,7 +177,7 @@ contract FlightSuretyApp {
     }
 
    /**
-    * @dev test if enough votes have been collected given a threshold
+    * @dev test if enough votes have been collected according to a given threshold
     *
     */ 
     function hasEnoughVotes
@@ -239,29 +232,29 @@ contract FlightSuretyApp {
                             requireHasNotVoted(multiCallsAirlines[_airline])
                             returns(bool success, uint256 votes)
     {
-        // initialize a variable to simplifie the if statement and avoid redundant code
+        // Initialize a variable to simplifie the if statement and avoid redundant code
         bool canBeRegistered =  false;
-        // calculate vote threshold according to the number of registered airlines
+        // Calculate vote threshold according to the number of registered airlines
         uint256 threshold =  calculThreshold(flightSuretyData.howManyRegisteredAirlines());
-        // test if the number of registered airlines exceed 4
+        // Test if the number of registered airlines exceed 4
         if(flightSuretyData.howManyRegisteredAirlines() >= 4) {
-            // add the voter to the airline's list of voters 
+            // Add the voter to the airline's list of voters 
             multiCallsAirlines[_airline].push(msg.sender);
-            // emit an event to keep trace of the number of votes
+            // Emit an event to keep trace of the number of votes
             emit AirlineHasOneMoreVote(msg.sender, multiCallsAirlines[_airline].length);
             
-            // check if the number of votes have reached the threshold
+            // Check if the number of votes have reached the threshold
             if(hasEnoughVotes(multiCallsAirlines[_airline], threshold)){
-                // reset the array of voters of the newly registered airline
+                // Reset the array of voters of the newly registered airline
                 multiCallsAirlines[_airline] = new address[](0);  
                 canBeRegistered =  true;
             }     
         } else {
             canBeRegistered =  true;
         }
-        // register the airline and emit the according event if requirements are met
+        // Register the airline and emit the according event if requirements are met
         if(canBeRegistered){
-            // ensure that the number of votes have been set to 0 
+            // Ensure that the number of votes have been set to 0 
             require(multiCallsAirlines[_airline].length == 0, "number of votes should be set to 0");
             flightSuretyData.registerAirline(_airline);
             emit AirlineWasRegisteredApp(_airline);
@@ -269,6 +262,10 @@ contract FlightSuretyApp {
         return (flightSuretyData.isAirline(_airline), multiCallsAirlines[_airline].length);
     }
 
+       /**
+    * @dev submit funds to fund an airline
+    * 
+    */
 
     function submitFundsAirline
                                 (
@@ -279,9 +276,10 @@ contract FlightSuretyApp {
                                 requireEnoughFunds
                                 returns(bool succes)
     {
-        // pass registration fees to data contract to allow the airline to fund the seed.
+        // Pass registration fees to data contract to allow the airline to fund the seed.
         // contractOwner.transfer(100000000000);
         flightSuretyData.submitFundsAirline(msg.sender, AIRLINE_REGISTRATION_FEE);
+        // Emit according event
         emit AirlineWasFundedApp(msg.sender, AIRLINE_REGISTRATION_FEE);
         return (flightSuretyData.isFundedAirline(msg.sender));
     }
@@ -301,9 +299,33 @@ contract FlightSuretyApp {
                                 external
                                 returns(bool success)
     {
+        // Send request to data contract to register a flight
         flightSuretyData.registerFlight(_flightName, _timeStamp, STATUS_CODE_UNKNOWN, msg.sender);
+        // Emit according event
         emit FlightWasRegisteredApp(_flightName, _timeStamp, msg.sender);
         return flightSuretyData.isFlight(_flightName, _timeStamp, msg.sender);
+    }
+
+    /**
+    * @dev Allows passenger to insure a flight
+    *
+    */ 
+
+    function buyInsurance
+                            (
+                                    string _flightName,
+                                    uint256 _timeStamp,
+                                    address _airline
+                            )
+                            payable
+                            requireRequiredValue
+                            returns(bool success)
+    {
+        // Send request to data contract to insure a flight
+        flightSuretyData.buyInsurance(_flightName, _timeStamp, _airline, msg.sender, msg.value);
+        // Emit according event
+        emit newInsuranceApp(_flightName, msg.sender, msg.value);
+        return flightSuretyData.isInsured(_flightName, _timeStamp, _airline, msg.sender, msg.value);
     }
     
    /**

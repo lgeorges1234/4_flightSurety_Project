@@ -287,6 +287,93 @@ contract('Flight Surety App Tests ', async (accounts) => {
     // ASSERT
     assert.equal(isFlightResult, true, "Flight has not been registered");
     assert.equal(result.logs[0].event, "FlightWasRegisteredApp", "Event FlightWasRegisteredApp has not been emitted" )
-  })
+  });
+
+  it('(passenger) cannot buy insurance using buyInsurance() if not enough funds are provided', async () => {
+    
+    // ARRANGE
+    let notEnoughAmount = false;
+    let result;
+    let passenger = accounts[11];
+    let flight = 'ND1309'; // Course number
+    let timestamp= Math.floor(Date.now() / 1000);
+    let airline = accounts[2];
+    let INSURANCE_PRICE = web3.utils.toWei("0", "ether");
+    
+    await config.flightSuretyApp.registerFlight(flight, timestamp, {from:airline});
+
+    // ACT
+    try {
+      result = await config.flightSuretyApp.buyInsurance(flight, timestamp, airline, {from: passenger, value: INSURANCE_PRICE} );
+    }
+    catch(e) {
+      notEnoughAmount = true;
+    }
+
+    let isInsuranceBought = await config.flightSuretyData.isInsured.call(flight, timestamp, airline, passenger, INSURANCE_PRICE); 
+    
+    // ASSERT
+    assert.equal(isInsuranceBought, false, "Passenger should not be able to buy an insurrance for a flight if no funds are provided");
+    assert.equal(notEnoughAmount, true, "Revert should show that not enough eth was provided");
+  });
+
+  it('(passenger) cannot buy insurance using buyInsurance() if too much funds are provided', async () => {
+    
+    // ARRANGE
+    let tooMuchAmount = false;
+    let result;
+    let passenger = accounts[11];
+    let flight = 'ND1309'; // Course number
+    let timestamp= Math.floor(Date.now() / 1000);
+    let airline = accounts[2];
+    let INSURANCE_PRICE = web3.utils.toWei("2", "ether");
+    
+    await config.flightSuretyApp.registerFlight(flight, timestamp, {from:airline});
+
+    // ACT
+    try {
+      result = await config.flightSuretyApp.buyInsurance(flight, timestamp, airline, {from: passenger, value: INSURANCE_PRICE} );
+    }
+    catch(e) {
+      tooMuchAmount = true;
+    }
+
+    let isInsuranceBought = await config.flightSuretyData.isInsured.call(flight, timestamp, airline, passenger, INSURANCE_PRICE); 
+    
+    // ASSERT
+    assert.equal(isInsuranceBought, false, "Passenger should not be able to buy an insurrance for a flight if no funds are provided");
+    assert.equal(tooMuchAmount, true, "Revert should show that too many eth was provided");
+  });
+
+  it('(passenger) can buy insurance using buyInsurance()', async () => {
+
+    
+    // ARRANGE
+    let result;
+    let passenger = accounts[11];
+    let flight = 'ND1309'; // Course number
+    let timestamp= Math.floor(Date.now() / 1000);
+    let airline = accounts[2];
+    let INSURANCE_PRICE = web3.utils.toWei("1", "ether");
+    
+    await config.flightSuretyApp.registerFlight(flight, timestamp, {from:airline});
+
+    // ACT
+    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    try {
+      result = await config.flightSuretyApp.buyInsurance(flight, timestamp, airline, {from: passenger, value: INSURANCE_PRICE} );
+    }
+    catch(e) {
+
+    }
+
+    let isInsuranceBought = await config.flightSuretyData.isInsured.call(flight, timestamp, airline, passenger, INSURANCE_PRICE); 
+    
+    let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
+    // ASSERT
+    assert.equal(isInsuranceBought, true, "passenger should be able to buy an insurrance for a flight");
+    assert.equal(contractBalanceAfter - contractBalanceBefore, INSURANCE_PRICE, "Balance has not been increased from funds")
+    assert.equal(result.logs[0].event , "newInsuranceApp", "Event newInsuranceApp was not emitted");
+  });
 
 });
