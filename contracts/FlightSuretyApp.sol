@@ -339,9 +339,9 @@ contract FlightSuretyApp {
                                     uint256 timestamp,
                                     uint8 statusCode
                                 )
-                                internal
-                                pure
+                                
     {
+        flightSuretyData.creditInsurees(airline, flight, timestamp, statusCode);
     }
 
 

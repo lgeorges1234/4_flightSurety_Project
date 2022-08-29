@@ -193,4 +193,36 @@ contract('Flight Surety Data Tests', async (accounts) => {
     assert.equal(result.logs[1].event, "newInsurance", "Event newInsurance has not been emitted");
   });
 
+  it('() update status code and add insurance amount to passengers balance if fligth has been delayed using creditInsurance', async () => {
+    
+    // ARRANGE
+    let result;
+    let passenger = accounts[11];
+    let flight = 'ND1309'; // Course number
+    let timestamp= Math.floor(Date.now() / 1000);
+    let airline = accounts[3];
+    let INSURANCE_PRICE = web3.utils.toWei("1", "ether");
+
+    await config.flightSuretyData.registerFlight(flight, timestamp , 0, airline);
+    await config.flightSuretyData.buyInsurance(flight, timestamp, airline, passenger, INSURANCE_PRICE);
+
+    // ACT
+    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+
+    try {
+        result = await config.flightSuretyData.creditInsurees(airline, flight, timestamp, 50);
+      }
+    catch(e) {
+
+    }
+    let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
+    let isFlightSatusUpdated = await config.flightSuretyData.viewFlightSatus.call(flight, airline, timestamp); 
+
+    // ASSERT
+    assert.equal(isFlightSatusUpdated, 50, "Flight status has not been updated");
+    assert.equal(contractBalanceBefore - contractBalanceAfter,  1500000000000000000, "Solde has not changed");
+    assert.equal(result.logs[0].event, "statusCodeUpddated", "Event statusCodeUpddated has not been emitted");
+    assert.equal(result.logs[1].event, "passengerCredited", "Event passengerCredited has not been emitted");
+  });
+
 });

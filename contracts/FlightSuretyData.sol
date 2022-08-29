@@ -48,6 +48,13 @@ contract FlightSuretyData {
 
     mapping (bytes32 => Insurance) Insurances;
 
+    struct Passenger {
+        address passenger;
+        uint256 account;
+    }
+
+    mapping (address => Passenger) Passengers;
+
 /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
     /********************************************************************************************/
@@ -107,6 +114,9 @@ contract FlightSuretyData {
     event funded(address airline, address contractAddress, uint256 amount);
     event FlightWasRegistered(bytes32 _flightID, string _flightName, uint256 _timeStamp, uint8 _statusCode, address _airline);
     event newInsurance(bytes32 insuranceID, string flightName, address passenger, uint256 value);
+    event statusCodeUpddated(address _airline, string _flightName, uint256 _timestamp, uint8 _statusCode);
+    event passengerCredited(address _airline, string _flightName, uint256 _timeStamp, uint8 _statusCode, address _passenger, uint256 _value);
+
 
     /********************************************************************************************/
     /*                                         CONSTRUCTOR                                      */
@@ -313,7 +323,7 @@ contract FlightSuretyData {
     {
         // Get a unique 32 bytes ID to the flight given airline, flight name and timestamp
         bytes32 _flightID = getFlightKey(_airline, _flightName, _timeStamp); 
-        // Check if the flight is registered
+        // Check if flight is registered
         require(Flights[_flightID].isRegistered == true, "Flight must first be registered before to get status");
         return Flights[_flightID].statusCode;  
     }
@@ -335,11 +345,11 @@ contract FlightSuretyData {
     {
         // Record account balance before it changes
         uint256 beforeBalance = totalBalance;
-        // Get a unique 32 bytes ID to the flight given airline, flight name and timestamp
+        // Get a unique 32 bytes ID to flight given airline, flight name and timestamp
         bytes32 _flightID = getFlightKey(_airline, _flightName, _timeStamp); 
-        // Check if the flight is registered
+        // Check if flight is registered
         require(Flights[_flightID].isRegistered == true, "Flight is not registered");
-        // Get a unique 32 bytes ID to the insurance given flight id, passenger address and amount given.
+        // Get a unique 32 bytes ID to insurance given flight id, passenger address and amount given.
         bytes32 _insuranceID = getInsuranceKey(_flightID, _passenger, _value); 
         // Fund contract with insurance
         fund(_passenger, _value);
@@ -380,10 +390,39 @@ contract FlightSuretyData {
     */
     function creditInsurees
                                 (
+                                    address _airline,
+                                    string _flightName,
+                                    uint256 _timestamp,
+                                    uint8 _statusCode
                                 )
                                 external
-                                pure
     {
+        /// Update flight status 
+        bytes32 _flightID = getFlightKey(_airline, _flightName, _timestamp); 
+        // Check if the flight is registered
+        require(Flights[_flightID].isRegistered == true, "Flight is not registered");
+        // Check if the status of the flight has not previously been set in order to avoid multiple credit
+        require(Flights[_flightID].statusCode == 0, "Status of this flight have already been set");
+        // Update status for the flight
+        Flights[_flightID].statusCode = _statusCode;
+        emit statusCodeUpddated(_airline, _flightName, _timestamp, _statusCode);
+        /// Credit passenger sold
+        // Process credit only if flight is delayed
+        if(_statusCode > 10){
+            // check first if an insurance have been taken on this flight before looping through the array
+            require(Flights[_flightID].insuranceID.length > 0, "There is no insurance on this flight");
+            // Loop through all flight's insurance
+            for(uint i; i < Flights[_flightID].insuranceID.length; i++) {
+                bytes32 _insuranceID = Flights[_flightID].insuranceID[i];
+                address _passenger = Insurances[_insuranceID].passenger;
+                uint256 _value = Insurances[_insuranceID].value.mul(3).div(2);
+                // Credit passenger account according to it's insurance amount
+                Passengers[_passenger].account = Passengers[_passenger].account.add(_value);
+                // Debit contract's account
+                totalBalance = totalBalance.sub(_value);
+                emit passengerCredited(_airline, _flightName, _timestamp, _statusCode, _passenger, _value);
+            }
+        }
     }
     
     /**
