@@ -48,12 +48,12 @@ contract FlightSuretyData {
 
     mapping (bytes32 => Insurance) Insurances;
 
-    struct Passenger {
-        address passenger;
-        uint256 account;
-    }
+    // struct Account {
+    //     address account;
+    //     uint256 balance;
+    // }
 
-    mapping (address => Passenger) Passengers;
+    mapping (address => uint256) Accounts;
 
 /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
@@ -116,7 +116,7 @@ contract FlightSuretyData {
     event newInsurance(bytes32 insuranceID, string flightName, address passenger, uint256 value);
     event statusCodeUpddated(address _airline, string _flightName, uint256 _timestamp, uint8 _statusCode);
     event passengerCredited(address _airline, string _flightName, uint256 _timeStamp, uint8 _statusCode, address _passenger, uint256 _value);
-
+    event accountTransfer(address _passenger, uint256 _amount, uint256 remainingSolde);
 
     /********************************************************************************************/
     /*                                         CONSTRUCTOR                                      */
@@ -237,13 +237,13 @@ contract FlightSuretyData {
 
     {
         // Store the actual balance of the contract
-        uint256 beforeBalance = totalBalance;
+        uint256 beforeBalance = Accounts[address(this)];
         // Send the amount to the fund function
         // to transfer the amount to the contract address
         // and add the amount to the contract balance
         fund(_airline, _amount);
         // Check if the balance has been increased
-        require(totalBalance.sub(beforeBalance) == _amount, "Funds have not been provided");
+        require(Accounts[address(this)].sub(beforeBalance) == _amount, "Funds have not been provided");
         // Mark the airline as "funded"
         
         // Airlines[_airline] = Airline({airline: _airline, registered: true, funded: true, flight: });
@@ -344,7 +344,7 @@ contract FlightSuretyData {
                             payable
     {
         // Record account balance before it changes
-        uint256 beforeBalance = totalBalance;
+        uint256 beforeBalance = Accounts[address(this)];
         // Get a unique 32 bytes ID to flight given airline, flight name and timestamp
         bytes32 _flightID = getFlightKey(_airline, _flightName, _timeStamp); 
         // Check if flight is registered
@@ -354,7 +354,7 @@ contract FlightSuretyData {
         // Fund contract with insurance
         fund(_passenger, _value);
         // Check if the balance has been increased
-        require(totalBalance.sub(beforeBalance) == _value, "Funds have not been provided");
+        require(Accounts[address(this)].sub(beforeBalance) == _value, "Funds have not been provided");
         // Initiate insurance in insurance mapping
         Insurances[_insuranceID] = Insurance({insuranceID: _insuranceID, flightID: _flightID, passenger: _passenger, value: _value});
         // Add insurance ID to flight in flights mapping
@@ -417,9 +417,9 @@ contract FlightSuretyData {
                 address _passenger = Insurances[_insuranceID].passenger;
                 uint256 _value = Insurances[_insuranceID].value.mul(3).div(2);
                 // Credit passenger account according to it's insurance amount
-                Passengers[_passenger].account = Passengers[_passenger].account.add(_value);
+                Accounts[_passenger] = Accounts[_passenger].add(_value);
                 // Debit contract's account
-                totalBalance = totalBalance.sub(_value);
+                Accounts[address(this)] = Accounts[address(this)].sub(_value);
                 emit passengerCredited(_airline, _flightName, _timestamp, _statusCode, _passenger, _value);
             }
         }
@@ -442,12 +442,18 @@ contract FlightSuretyData {
      *  @dev Transfers eligible payout funds to insuree
      *
     */
-    function pay
+    function withdraw
                             (
+                                address _account,
+                                uint256 _amount
                             )
                             external
-                            pure
+                            payable
     {
+        require(Accounts[_account] >= _amount, "You don't have sufficient funds to withdraw this amount");
+        Accounts[_account] = Accounts[_account].sub(_amount);
+        // _account.transfer(_amount);
+        emit accountTransfer(_account, _amount, Accounts[_account]);
     }
 
    /**
@@ -458,27 +464,38 @@ contract FlightSuretyData {
     function fund
                             (   
                                 address _account,
-                                uint256 _amount
+                                uint256 _value
                             )
                             public
                             payable
     {
         // Transfer the amount to the contract address
-        emit funded(_account, contractOwner, _amount);
-        // erc20.transferFrom(_account, contractOwner, _amount);
-        // contractOwner.transfer(_amount);
+        // erc20.transferFrom(_account, address(this), _value);
+        // address(this).transfer(_value);
         // Increase the balance of the contract
-        totalBalance = totalBalance.add(_amount);
+        Accounts[address(this)] = Accounts[address(this)].add(_value);
+        emit funded(_account, address(this), _value);
     }
 
     function getBalance
+                            (
+                                address _account
+                            )
+                            external
+                            view
+                            returns(uint256)
+    {
+        return Accounts[_account];
+    }
+
+    function getContractBalance
                             (
                             )
                             external
                             view
                             returns(uint256)
     {
-        return totalBalance;
+        return Accounts[address(this)];
     }
 
     function getFlightKey

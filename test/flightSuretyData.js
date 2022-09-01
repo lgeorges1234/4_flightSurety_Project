@@ -100,7 +100,7 @@ contract('Flight Surety Data Tests', async (accounts) => {
     let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
     await config.flightSuretyData.registerAirline(newAirline, {from: config.firstAirline}); 
     // ACT
-    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    let contractBalanceBefore = await config.flightSuretyData.getContractBalance.call();
 
     try {
         result = await config.flightSuretyData.fund(newAirline, AIRLINE_REGISTRATION_FEE, {from: newAirline});
@@ -109,7 +109,7 @@ contract('Flight Surety Data Tests', async (accounts) => {
       console.log(e)
     }
 
-    let contractBalanceAfter = await config.flightSuretyData.getBalance.call(); 
+    let contractBalanceAfter = await config.flightSuretyData.getContractBalance.call(); 
 
     // ASSERT
     assert.equal(contractBalanceAfter-contractBalanceBefore, AIRLINE_REGISTRATION_FEE, "Airline funds have not been collected")
@@ -123,14 +123,14 @@ contract('Flight Surety Data Tests', async (accounts) => {
     let newAirline = accounts[2];
     let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
     // ACT
-    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    let contractBalanceBefore = await config.flightSuretyData.getContractBalance.call();
     try {
         result = await config.flightSuretyData.submitFundsAirline(newAirline, AIRLINE_REGISTRATION_FEE, {from: newAirline});
     }
     catch(e) {
 
     }
-    let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
+    let contractBalanceAfter = await config.flightSuretyData.getContractBalance.call();
 
     let isFundedResult = await config.flightSuretyData.isFundedAirline.call(newAirline); 
 
@@ -176,14 +176,14 @@ contract('Flight Surety Data Tests', async (accounts) => {
     await config.flightSuretyData.registerFlight(flight, timestamp , 0, airline);
 
     // ACT
-    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    let contractBalanceBefore = await config.flightSuretyData.getContractBalance.call();
     try {
         result = await config.flightSuretyData.buyInsurance(flight, timestamp, airline, passenger, INSURANCE_PRICE);
       }
     catch(e) {
 
     }
-    let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
+    let contractBalanceAfter = await config.flightSuretyData.getContractBalance.call();
 
     let isInsuranceBought = await config.flightSuretyData.isInsured.call(flight, timestamp, airline, passenger, INSURANCE_PRICE); 
 
@@ -205,17 +205,16 @@ contract('Flight Surety Data Tests', async (accounts) => {
 
     await config.flightSuretyData.registerFlight(flight, timestamp , 0, airline);
     await config.flightSuretyData.buyInsurance(flight, timestamp, airline, passenger, INSURANCE_PRICE);
-
     // ACT
-    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    let contractBalanceBefore = await config.flightSuretyData.getContractBalance.call();
 
     try {
         result = await config.flightSuretyData.creditInsurees(airline, flight, timestamp, 50);
       }
     catch(e) {
-
+      console.log(e)
     }
-    let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
+    let contractBalanceAfter = await config.flightSuretyData.getContractBalance.call();
     let isFlightSatusUpdated = await config.flightSuretyData.viewFlightSatus.call(flight, airline, timestamp); 
 
     // ASSERT
@@ -223,6 +222,38 @@ contract('Flight Surety Data Tests', async (accounts) => {
     assert.equal(contractBalanceBefore - contractBalanceAfter,  1500000000000000000, "Solde has not changed");
     assert.equal(result.logs[0].event, "statusCodeUpddated", "Event statusCodeUpddated has not been emitted");
     assert.equal(result.logs[1].event, "passengerCredited", "Event passengerCredited has not been emitted");
+  });
+
+  it('() transfer money to passenger account using withdraw()', async () => {
+    
+    // ARRANGE
+    let result;
+    let passenger = accounts[11];
+    let flight = 'ND1309'; // Course number
+    let timestamp= Math.floor(Date.now() / 1000);
+    let airline = accounts[3];
+    let INSURANCE_PRICE = web3.utils.toWei("1", "ether");
+
+    await config.flightSuretyData.registerFlight(flight, timestamp , 0, airline);
+    await config.flightSuretyData.buyInsurance(flight, timestamp, airline, passenger, INSURANCE_PRICE);
+    await config.flightSuretyData.creditInsurees(airline, flight, timestamp, 50);
+
+    let balancePassengerBefore = await web3.eth.getBalance(passenger);
+    console.log(balancePassengerBefore)
+    // ACT
+
+    try {
+        result = await config.flightSuretyData.withdraw(passenger, INSURANCE_PRICE);
+      }
+    catch(e) {
+      console.log(e)
+    }
+
+    let balancePassengerAfter = await web3.eth.getBalance(passenger);
+    console.log(balancePassengerAfter)
+    // ASSERT
+    // assert.equal(balancePassengerAfter - balancePassengerBefore,  1500000000000000000, "Balance has not changed");
+    assert.equal(result.logs[0].event, "accountTransfer", "Event passengerAccountTransfer has not been emitted");
   });
 
 });

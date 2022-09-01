@@ -97,7 +97,7 @@ contract('Flight Surety App Tests ', async (accounts) => {
     
     // ARRANGE
     let submitFundsResult;
-    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    let contractBalanceBefore = await config.flightSuretyData.getContractBalance.call();
     // ACT
     try {
       submitFundsResult = await config.flightSuretyApp.submitFundsAirline({from: config.firstAirline, value:AIRLINE_REGISTRATION_FEE});
@@ -108,7 +108,7 @@ contract('Flight Surety App Tests ', async (accounts) => {
 
     let result = await config.flightSuretyData.isFundedAirline.call(config.firstAirline); 
     
-    let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
+    let contractBalanceAfter = await config.flightSuretyData.getContractBalance.call();
     // ASSERT
     assert.equal(result, true, "Airline should be able to fund the contract");
     assert.equal(contractBalanceAfter - contractBalanceBefore, AIRLINE_REGISTRATION_FEE, "Balance has not been increased from funds")
@@ -351,7 +351,7 @@ contract('Flight Surety App Tests ', async (accounts) => {
     // ARRANGE
     let result;
     let passenger = accounts[11];
-    let flight = 'ND1309'; // Course number
+    let flight = 'ND1308'; // Course number
     let timestamp= Math.floor(Date.now() / 1000);
     let airline = accounts[2];
     let INSURANCE_PRICE = web3.utils.toWei("1", "ether");
@@ -359,7 +359,8 @@ contract('Flight Surety App Tests ', async (accounts) => {
     await config.flightSuretyApp.registerFlight(flight, timestamp, {from:airline});
 
     // ACT
-    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    let contractBalanceBefore = await config.flightSuretyData.getContractBalance.call();
+
     try {
       result = await config.flightSuretyApp.buyInsurance(flight, timestamp, airline, {from: passenger, value: INSURANCE_PRICE} );
     }
@@ -369,14 +370,15 @@ contract('Flight Surety App Tests ', async (accounts) => {
 
     let isInsuranceBought = await config.flightSuretyData.isInsured.call(flight, timestamp, airline, passenger, INSURANCE_PRICE); 
     
-    let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
+    let contractBalanceAfter = await config.flightSuretyData.getContractBalance.call();
+
     // ASSERT
     assert.equal(isInsuranceBought, true, "passenger should be able to buy an insurrance for a flight");
     assert.equal(contractBalanceAfter - contractBalanceBefore, INSURANCE_PRICE, "Balance has not been increased from funds")
     assert.equal(result.logs[0].event , "newInsuranceApp", "Event newInsuranceApp was not emitted");
   });
 
-  it('() update status code and add insurance amount to passengers balance if fligth has been delayed using creditInsurance', async () => {
+  it('() process fetched status code', async () => {
     
     // ARRANGE
     let result;
@@ -390,21 +392,100 @@ contract('Flight Surety App Tests ', async (accounts) => {
     await config.flightSuretyData.buyInsurance(flight, timestamp, airline, passenger, INSURANCE_PRICE);
 
     // ACT
-    let contractBalanceBefore = await config.flightSuretyData.getBalance.call();
+    let contractBalanceBefore = await config.flightSuretyData.getContractBalance.call();
 
     try {
-        result = await config.flightSuretyApp.creditInsurees(airline, flight, timestamp, 50);
+        result = await config.flightSuretyApp.processFlightStatus(airline, flight, timestamp, 50);
       }
     catch(e) {
 
     }
-    let contractBalanceAfter = await config.flightSuretyData.getBalance.call();
+    let contractBalanceAfter = await config.flightSuretyData.getContractBalance.call();
     let isFlightSatusUpdated = await config.flightSuretyData.viewFlightSatus.call(flight, airline, timestamp); 
-    console.log(isFlightSatusUpdated.toString())
+
     // ASSERT
     assert.equal(isFlightSatusUpdated.toString(), 50, "Flight status has not been updated");
     assert.equal(contractBalanceBefore - contractBalanceAfter,  1500000000000000000, "Solde has not changed")
-    assert.equal(result.logs[0].event, "passengerCredited", "Event passengerCredited has not been emitted");
+    assert.equal(result.logs[0].event, "flightHasBeenProcessed", "Event flightHasBeenProcessed has not been emitted");
+  });
+
+  it('(Oracle) can be registered', async () => {
+    // ARRANGE
+    let AIRLINE_REGISTRATION_FEE = web3.utils.toWei("10", "ether");
+    // ACT
+    for(let a=29; a<50; a++){
+      await config.flightSuretyApp.registerOracle({from:accounts[a], value:AIRLINE_REGISTRATION_FEE});
+      let result = await config.flightSuretyApp.getMyIndexes.call({from: accounts[a]});
+      // console.log(`${a}: Oracle Registered: ${result[0]}, ${result[1]}, ${result[2]}`)
+    }
+  });
+
+  it('(Oracle) can submit an On Time flight status', async () => {
+    
+    // ARRANGE
+    let result;
+
+    let airline = config.firstAirline;
+    let flight = 'ND1310'; // Course number
+    let timestamp= Math.floor(Date.now() / 1000);
+
+    // Register a new flight
+    await config.flightSuretyApp.registerFlight(flight, timestamp, {from:airline});
+    // console.log(registerFlightResult.logs)
+
+    // request Oracles to get status information for a flight
+    let fetchFlightStatusResult = await config.flightSuretyApp.fetchFlightStatus(airline, flight, timestamp);
+
+    for(let a=29; a<50; a++){
+      let oracleIndexesResult = await config.flightSuretyApp.getMyIndexes.call({from: accounts[a]});
+      for(let i=0; i<3; i++) {
+
+        if(oracleIndexesResult[i].toNumber() == fetchFlightStatusResult.logs[0].args.index) {
+          try {
+            result = await config.flightSuretyApp.submitOracleResponse(oracleIndexesResult[i], airline, flight, timestamp, 10, {from: accounts[a]});
+          } catch (e) {
+          }
+        }
+      }
+    }
+    assert.equal(result.logs[result.logs.length - 1].event, "flightHasBeenProcessed", "Event flightHasBeenProcessed has not been emitted");
+    assert.equal(result.logs[result.logs.length - 1].args[3], 10, "Status Code has not been updated correctly");
+  });
+
+  it('(Oracle) can submit delayed flight status', async () => {
+    
+    // ARRANGE
+    let result;
+
+    let airline = config.firstAirline;
+    let flight = 'ND1311'; // Course number
+    let timestamp= Math.floor(Date.now() / 1000);
+    let passenger = accounts[11];
+    let INSURANCE_PRICE = web3.utils.toWei("1", "ether");
+
+    // Register a new flight
+    await config.flightSuretyApp.registerFlight(flight, timestamp, {from:airline});
+
+    // Buy insurance on the new flight
+    await config.flightSuretyData.buyInsurance(flight, timestamp, airline, passenger, INSURANCE_PRICE);
+
+    // request Oracles to get status information for a flight
+    let fetchFlightStatusResult = await config.flightSuretyApp.fetchFlightStatus(airline, flight, timestamp);
+
+    for(let a=29; a<50; a++){
+      let oracleIndexesResult = await config.flightSuretyApp.getMyIndexes.call({from: accounts[a]});
+      for(let i=0; i<3; i++) {
+
+        if(oracleIndexesResult[i].toNumber() == fetchFlightStatusResult.logs[0].args.index) {
+          try {
+            result = await config.flightSuretyApp.submitOracleResponse(oracleIndexesResult[i], airline, flight, timestamp, 50, {from: accounts[a]});
+          } catch (e) {
+          }
+        }
+      }
+    }
+    assert.equal(result.logs[result.logs.length - 1].event, "flightHasBeenProcessed", "Event flightHasBeenProcessed has not been emitted");
+    assert.equal(result.logs[result.logs.length - 1].args[3], 50, "Status Code has not been updated correctly");
   });
 
 });

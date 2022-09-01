@@ -125,6 +125,7 @@ contract FlightSuretyApp {
     event AirlineHasOneMoreVote(address airline, uint256 vote);
     event FlightWasRegisteredApp(string _flightName, uint256 _timeStamp, address _airline);
     event newInsuranceApp(string flightName, address passenger, uint256 value);
+    event flightHasBeenProcessed(address airline, string flight, uint256 timestamp, uint8 statusCode);
 
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
@@ -277,7 +278,7 @@ contract FlightSuretyApp {
                                 returns(bool succes)
     {
         // Pass registration fees to data contract to allow the airline to fund the seed.
-        // contractOwner.transfer(100000000000);
+        // address(this).transfer(100000000000);
         flightSuretyData.submitFundsAirline(msg.sender, AIRLINE_REGISTRATION_FEE);
         // Emit according event
         emit AirlineWasFundedApp(msg.sender, AIRLINE_REGISTRATION_FEE);
@@ -342,6 +343,7 @@ contract FlightSuretyApp {
                                 
     {
         flightSuretyData.creditInsurees(airline, flight, timestamp, statusCode);
+        emit flightHasBeenProcessed(airline, flight, timestamp, statusCode);
     }
 
 
@@ -539,14 +541,3 @@ contract FlightSuretyApp {
 // endregion
 }   
 
-// contract FlightSuretyData {
-//     function isOperational() external pure returns(bool) {} 
-
-//     // Airlines
-//     function registerAirline (address _airline) external returns(bool) {} 
-//     function submitFundsAirline (address _airline, uint256 _amount) payable external {}
-//     function isAirline (address _airline) external returns(bool) {}        
-//     function isFundedAirline (address _airline ) external returns(bool){}   
-
-
-// }

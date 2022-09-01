@@ -8,16 +8,21 @@ module.exports = {
       host: "127.0.0.1",
       port: 8545,
       network_id: "*",
+      accounts: 50
     },
     dev: {
       host: "127.0.0.1",
       port: 7545,
       network_id: "*",
+      accounts: 50
     }
   },
   compilers: {
     solc: {
       version: "^0.4.24"
     }
+  },
+  mocha: {
+    useColors: true
   }
 };
