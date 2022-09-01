@@ -18,7 +18,12 @@ module.exports = {
             test: /\.js?$/,
             use: 'babel-loader',
             exclude: /node_modules/
-        }]
+        },
+        {
+
+            test: /\.(sa|sc|c)ss$/,
+            use: ["style-loader", "css-loader"]
+            }]
     },
     plugins: [
         new StartServerPlugin('server.js'),
